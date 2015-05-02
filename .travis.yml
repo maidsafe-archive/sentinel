@@ -7,8 +7,8 @@ rust:
 sudo: true
 branches:
   only:
-      - master
-      - gh-pages
+  - master
+  - gh-pages
 before_install:
 - sudo apt-get update -qq
 - sudo apt-get install -qq libsqlite3-dev
@@ -40,3 +40,6 @@ after_success: |
   sudo make install &&
   cd ../.. &&
   kcov --coveralls-id=$TRAVIS_JOB_ID --exclude-pattern=/.cargo target/kcov target/debug/routing-*;
+env:
+  global:
+    secure: gzmgOPjX4dbG5iE9YiGVK2YkcaJ57QKqxO0zB7pHSulpNf05OBGmwFFBPmawckODJaeig8NOekD9sdAD7CeWwVKl0Y8ayeleyT2M59S06L/pVrbkAzRy4YCQSvb85fjGsypK3kCh901HPB/o3XOrbY/VSquNGtVGJpot5Vp3AqU=
