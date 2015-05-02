@@ -22,10 +22,7 @@ extern crate accumulator;
 use std::collections::HashMap;
 use sodiumoxide::crypto;
 
-use message_header;
-use NameType;
-use types;
-use types::{Mergeable, QUORUM_SIZE};
+mod message_header;
 use frequency::Frequency;
 use messages::find_group_response::FindGroupResponse;
 use messages::get_client_key_response::GetKeyResponse;
@@ -43,34 +40,52 @@ type NodeAccumulatorType = accumulator::Accumulator<NodeKeyType, ResultType>;
 type GroupAccumulatorType = accumulator::Accumulator<GroupKeyType, ResultType>;
 type KeyAccumulatorType = accumulator::Accumulator<types::GroupAddress, ResultType>;
 
+pub trait Mergeable {
+        fn merge<'a, I>(xs: I) -> Option<Self> where I: Iterator<Item=&'a Self>;
+}
 
-// TODO (ben 2015-4-2): replace dynamic dispatching with static dispatching
-//          https://doc.rust-lang.org/book/static-and-dynamic-dispatch.html
 pub trait SendGetKeys {
   fn get_client_key(&mut self, address : NameType);
   fn get_group_key(&mut self, group_address : types::GroupAddress);
 }
 
-pub struct Sentinel<'a> {
+pub struct Sentinel<'a, k, v> where k: partialord + ord + clone, v: clone  {
   send_get_keys_: &'a mut (SendGetKeys + 'a),
   node_accumulator_: NodeAccumulatorType,
   group_accumulator_: GroupAccumulatorType,
   group_key_accumulator_: KeyAccumulatorType,
   node_key_accumulator_: KeyAccumulatorType,
+  group_size: u32,
 }
 
-impl<'a> Sentinel<'a> {
-    pub fn new(send_get_keys: &'a mut SendGetKeys) -> Sentinel<'a> {
+impl<'a> Sentinel<'a, k, v> where k: partialord + ord + clone, v: clone  {
+    pub fn new(send_get_keys: &'a mut SendGetKeys, quorum_size: usize) -> Sentinel<'a> {
       Sentinel {
         send_get_keys_: send_get_keys,
-        node_accumulator_: NodeAccumulatorType::new(QUORUM_SIZE as usize),
-        group_accumulator_: NodeAccumulatorType::new(QUORUM_SIZE as usize),
-        group_key_accumulator_: KeyAccumulatorType::new(QUORUM_SIZE as usize),
-        node_key_accumulator_: KeyAccumulatorType::new(QUORUM_SIZE as usize)
+        node_accumulator_: NodeAccumulatorType::new(quorum_size),
+        group_accumulator_: NodeAccumulatorType::new(quorum_size),
+        group_key_accumulator_: KeyAccumulatorType::new(quorum_size),
+        node_key_accumulator_: KeyAccumulatorType::new(quorum_size)
       }
     }
 
-    // pub fn get_send_get_keys(&'a mut self) -> &'a mut SendGetKeys { self.send_get_keys }
+    pub fn add_group_key(&mut self, message : types::SerialisedMessage, signature : types::Signature) -> Option<ResultType> {
+            let keys = self.node_key_accumulator_.add(header.from_group().unwrap(),
+                                                      (header.clone(), type_tag,
+                                                       message, signature));
+            if keys.is_some() {
+              let key = (header.from_group().unwrap(), header.message_id());
+              let messages = self.node_accumulator_.get(&key);
+              if messages.is_some() {
+                let resolved = Sentinel::resolve(Sentinel::validate_node(messages.unwrap().1,
+                                                                         keys.unwrap().1));
+                if resolved.is_some() {
+                  self.node_accumulator_.delete(&key);
+                  return resolved;
+                }
+              }
+            }
+    }
 
     pub fn add(&mut self, header: message_header::MessageHeader, type_tag: MessageTypeTag,
                message : types::SerialisedMessage, signature : types::Signature)
@@ -169,7 +184,7 @@ impl<'a> Sentinel<'a> {
 
     fn validate_node(messages: Vec<ResultType>,
                      keys:     Vec<ResultType>) -> Vec<ResultType> {
-        if messages.len() == 0 || keys.len() < QUORUM_SIZE as usize {
+        if messages.len() == 0 || keys.len() < quorum_size as usize {
           return Vec::new();
         }
 
@@ -178,11 +193,11 @@ impl<'a> Sentinel<'a> {
         let keys = keys.iter().filter_map(|key_msg| Sentinel::decode(&key_msg.2)).collect::<Vec<_>>();
 
         // Need to check this again because decoding may have failed.
-        if keys.len() < QUORUM_SIZE as usize {
+        if keys.len() < quorum_size as usize {
           return Vec::new();
         }
 
-        take_most_frequent(&keys, QUORUM_SIZE as usize)
+        take_most_frequent(&keys, quorum_size as usize)
             .into_iter()
             .flat_map(|GetKeyResponse{address: _, public_sign_key: pub_key}| {
                 messages.iter().filter_map(move |response| {
@@ -194,7 +209,7 @@ impl<'a> Sentinel<'a> {
 
     fn validate_group(messages: Vec<ResultType>,
                       keys:     Vec<ResultType>) -> Vec<ResultType> {
-        if messages.len() < QUORUM_SIZE as usize || keys.len() < QUORUM_SIZE as usize {
+        if messages.len() < quorum_size as usize || keys.len() < quorum_size as usize {
             return Vec::<ResultType>::new();
         }
 
@@ -203,7 +218,7 @@ impl<'a> Sentinel<'a> {
         let keys = keys.iter().filter_map(|key_msg| Sentinel::decode(&key_msg.2)).collect::<Vec<_>>();
 
         // Need to check this again because decoding may have failed.
-        if keys.len() < QUORUM_SIZE as usize {
+        if keys.len() < quorum_size as usize {
             return Vec::<ResultType>::new();
         }
 
@@ -233,7 +248,7 @@ impl<'a> Sentinel<'a> {
     }
 
     fn resolve(verified_messages : Vec<ResultType>) -> Option<ResultType> {
-        if verified_messages.len() < QUORUM_SIZE as usize {
+        if verified_messages.len() < quorum_size as usize {
             return None;
         }
 
@@ -277,7 +292,7 @@ impl<'a> Sentinel<'a> {
                              .map(|(_, _, body, _)| body)
                              .collect::<Vec<_>>();
 
-            take_most_frequent(&msg_bodies, QUORUM_SIZE as usize)
+            take_most_frequent(&msg_bodies, quorum_size as usize)
                 .map(|merged| { (header, tag, merged, signature) })
         }
     }
@@ -734,7 +749,7 @@ mod test {
       assert_eq!(2 * types::GROUP_SIZE as usize - 1, count_none_sentinel_returns(&sentinel_returns));
       assert_eq!(true, verify_exactly_one_response(&sentinel_returns));
       assert_eq!(1, get_selected_sentinel_returns(&mut sentinel_returns,
-                      &mut vec![(types::GROUP_SIZE + types::QUORUM_SIZE) as u64]).len());
+                      &mut vec![(types::GROUP_SIZE + types::quorum_size) as u64]).len());
     }
 
     assert_eq!(0, trace_get_keys.count_get_client_key_calls(&signature_group.get_group_address()));
@@ -794,7 +809,7 @@ mod test {
     assert_eq!(2 * types::GROUP_SIZE as usize - 1, count_none_sentinel_returns(&sentinel_returns));
     assert_eq!(true, verify_exactly_one_response(&sentinel_returns));
     assert_eq!(1, get_selected_sentinel_returns(&mut sentinel_returns,
-                    &mut vec![(types::GROUP_SIZE + types::QUORUM_SIZE) as u64]).len());
+                    &mut vec![(types::GROUP_SIZE + types::quorum_size) as u64]).len());
     }
   assert_eq!(0, trace_get_keys.count_get_client_key_calls(&embedded_signature_group.get_group_address()));
   assert_eq!(1, trace_get_keys.count_get_group_key_calls(&embedded_signature_group.get_group_address()));
@@ -847,7 +862,7 @@ mod test {
     assert_eq!(2 * types::GROUP_SIZE as usize - 1, count_none_sentinel_returns(&sentinel_returns));
     assert_eq!(true, verify_exactly_one_response(&sentinel_returns));
     assert_eq!(1, get_selected_sentinel_returns(&mut sentinel_returns,
-                    &mut vec![(types::GROUP_SIZE + types::QUORUM_SIZE) as u64]).len());
+                    &mut vec![(types::GROUP_SIZE + types::quorum_size) as u64]).len());
     }
   assert_eq!(0, trace_get_keys.count_get_client_key_calls(&embedded_signature_group.get_group_address()));
   assert_eq!(1, trace_get_keys.count_get_group_key_calls(&embedded_signature_group.get_group_address()));
