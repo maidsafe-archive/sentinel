@@ -1,0 +1,19 @@
+[package]
+
+name = "sentinel"
+version = "0.0.1"
+authors = ["MaidSafe Developers <dev@maidsafe.net>"]
+description = "p2p network group consensus"
+documentation = "http://dirvine.github.io/sentinel/"
+repository = "https://github.com/dirvine/sentinel"
+readme = "README.md"
+license = "GPL-3.0"
+homepage = "http://maidsafe.net"
+
+
+[dependencies]
+rustc-serialize = "*"
+cbor = "*"
+sodiumoxide = "0.0.4"
+rand = "*"
+accumulator = "0.0.1"
