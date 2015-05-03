@@ -18,11 +18,10 @@
 extern crate sodiumoxide;
 extern crate cbor;
 extern crate accumulator;
-
+mod frequency;
 use std::collections::HashMap;
 use sodiumoxide::crypto;
 
-mod message_header;
 use frequency::Frequency;
 use messages::find_group_response::FindGroupResponse;
 use messages::get_client_key_response::GetKeyResponse;
