@@ -15,50 +15,51 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-extern crate sodiumoxide;
-extern crate cbor;
+// extern crate sodiumoxide;
+// extern crate cbor;
 extern crate accumulator;
-mod frequency;
-use std::collections::HashMap;
-use sodiumoxide::crypto;
+// mod frequency;
+// use std::collections::HashMap;
+// use sodiumoxide::crypto;
+//
+// use frequency::Frequency;
+// use messages::find_group_response::FindGroupResponse;
+// use messages::get_client_key_response::GetKeyResponse;
+// use messages::get_group_key_response::GetGroupKeyResponse;
+// use messages::{MessageTypeTag};
+// use types::{PublicSignKey, SerialisedMessage};
+// use rustc_serialize::{Decodable, Encodable};
 
-use frequency::Frequency;
-use messages::find_group_response::FindGroupResponse;
-use messages::get_client_key_response::GetKeyResponse;
-use messages::get_group_key_response::GetGroupKeyResponse;
-use messages::{MessageTypeTag};
-use types::{PublicSignKey, SerialisedMessage};
-use rustc_serialize::{Decodable, Encodable};
+/// Trait for Messages to define their merge behaviour
+// pub trait Mergeable {
+//     fn merge<'a, I>(xs: I) -> Option<Self> where I: Iterator<Item=&'a Self>;
+// }
 
-pub type ResultType = (message_header::MessageHeader,
-                       MessageTypeTag, SerialisedMessage, types::Signature);
-
-type NodeKeyType = (types::NodeAddress, types::MessageId);
-type GroupKeyType = (types::GroupAddress, types::MessageId);
-type NodeAccumulatorType = accumulator::Accumulator<NodeKeyType, ResultType>;
-type GroupAccumulatorType = accumulator::Accumulator<GroupKeyType, ResultType>;
-type KeyAccumulatorType = accumulator::Accumulator<types::GroupAddress, ResultType>;
-
-pub trait Mergeable {
-        fn merge<'a, I>(xs: I) -> Option<Self> where I: Iterator<Item=&'a Self>;
+pub trait Claimable<Name, PublicSignKey> {
+    fn verify(public_key: PublicSignKey, message: &Vec<u8>) -> bool;
+    fn merge<'a, I>(xs: I) -> Option<Self> where I: Iterator<Item=&'a Self>;
+    fn claimant() -> Name;
 }
 
-pub trait SendGetKeys {
-  fn get_client_key(&mut self, address : NameType);
-  fn get_group_key(&mut self, group_address : types::GroupAddress);
+pub trait GetSigningKeys<Name> where Name: Eq + PartialOrd + Ord  + Clone {
+  fn get_keys(&mut self);
 }
 
-pub struct Sentinel<'a, k, v> where k: partialord + ord + clone, v: clone  {
-  send_get_keys_: &'a mut (SendGetKeys + 'a),
-  node_accumulator_: NodeAccumulatorType,
-  group_accumulator_: GroupAccumulatorType,
-  group_key_accumulator_: KeyAccumulatorType,
-  node_key_accumulator_: KeyAccumulatorType,
-  group_size: u32,
+pub struct Sentinel<Request, Claim, Name, PublicSignKey> // later template also on Signature
+    where Request: GetSigningKeys<Name> + PartialOrd + Ord + Clone,
+          Claim: Clone + Claimable<Name, PublicSignKey>,
+          Name: Eq + PartialOrd + Ord + Clone,
+          // Signature: Clone,
+          PublicSignKey: Clone {
+  claim_accumulator: accumulator::Accumulator<Request, Claim>,
+  keys_accumulator : accumulator::Accumulator<Request, Vec<(Name, PublicSignKey)>>,
+  claim_threshold: u32,
+  keys_threshold: u32
 }
 
+/*
 impl<'a> Sentinel<'a, k, v> where k: partialord + ord + clone, v: clone  {
-    pub fn new(send_get_keys: &'a mut SendGetKeys, quorum_size: usize) -> Sentinel<'a> {
+    pub fn new(send_get_keys: &'a mut SendGetKeys, message_keys_thresholde: usize) -> Sentinel<'a> {
       Sentinel {
         send_get_keys_: send_get_keys,
         node_accumulator_: NodeAccumulatorType::new(quorum_size),
@@ -1393,3 +1394,4 @@ mod test {
   }
 
 }
+*/

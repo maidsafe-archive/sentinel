@@ -14,3 +14,10 @@ Confirm group based consensus on messages in a p2p network
 None
 
 ##Todo Items
+
+- [x] Restructure generic types
+
+##External Todo Items
+
+- [ ] On Accumulator crate:
+    - [ ] Only store one value on identical values received
