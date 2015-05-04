@@ -17,23 +17,14 @@
 
 // extern crate sodiumoxide;
 // extern crate cbor;
+extern crate rustc_serialize;
 extern crate accumulator;
 // mod frequency;
 // use std::collections::HashMap;
-// use sodiumoxide::crypto;
-//
-// use frequency::Frequency;
-// use messages::find_group_response::FindGroupResponse;
-// use messages::get_client_key_response::GetKeyResponse;
-// use messages::get_group_key_response::GetGroupKeyResponse;
-// use messages::{MessageTypeTag};
-// use types::{PublicSignKey, SerialisedMessage};
-// use rustc_serialize::{Decodable, Encodable};
 
-/// Trait for Messages to define their merge behaviour
-// pub trait Mergeable {
-//     fn merge<'a, I>(xs: I) -> Option<Self> where I: Iterator<Item=&'a Self>;
-// }
+use accumulator::Accumulator;
+// use frequency::Frequency;
+use rustc_serialize::{Decodable, Encodable};
 
 pub trait Claimable<Name, PublicSignKey> {
     fn verify(public_key: PublicSignKey, message: &Vec<u8>) -> bool;
@@ -42,19 +33,36 @@ pub trait Claimable<Name, PublicSignKey> {
 }
 
 pub trait GetSigningKeys<Name> where Name: Eq + PartialOrd + Ord  + Clone {
-  fn get_keys(&mut self);
+  fn get_signing_keys(&mut self);
 }
 
 pub struct Sentinel<Request, Claim, Name, PublicSignKey> // later template also on Signature
     where Request: GetSigningKeys<Name> + PartialOrd + Ord + Clone,
-          Claim: Clone + Claimable<Name, PublicSignKey>,
+          Claim: Clone + Claimable<Name, PublicSignKey> + Encodable + Decodable,
           Name: Eq + PartialOrd + Ord + Clone,
           // Signature: Clone,
           PublicSignKey: Clone {
-  claim_accumulator: accumulator::Accumulator<Request, Claim>,
-  keys_accumulator : accumulator::Accumulator<Request, Vec<(Name, PublicSignKey)>>,
-  claim_threshold: u32,
-  keys_threshold: u32
+  claim_accumulator: Accumulator<Request, Claim>,
+  keys_accumulator : Accumulator<Request, Vec<(Name, PublicSignKey)>>,
+  claim_threshold: usize,
+  keys_threshold: usize
+}
+
+impl<Request, Claim, Name, PublicSignKey> Sentinel<Request, Claim, Name, PublicSignKey>
+    where Request: GetSigningKeys<Name> + PartialOrd + Ord + Clone,
+          Claim: Clone + Claimable<Name, PublicSignKey> + Encodable + Decodable,
+          Name: Eq + PartialOrd + Ord + Clone,
+          // Signature: Clone,
+          PublicSignKey: Clone {
+    pub fn new(claim_threshold: usize, keys_threshold: usize)
+        -> Sentinel<Request, Claim, Name, PublicSignKey> {
+        Sentinel {
+            claim_accumulator: Accumulator::new(claim_threshold),
+            keys_accumulator: Accumulator::new(keys_threshold),
+            claim_threshold: claim_threshold,
+            keys_threshold: keys_threshold
+        }
+    }
 }
 
 /*
