@@ -15,11 +15,15 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-//! Sentinel confirms the origin of a claim in a decentralised network.
+//! Sentinel cryptographically confirms the origin of a claim in a decentralised network.
 //!
 //! A claim has to implement Claimable in order to be verifiable and mergeable.
 //! A request has to implement GetSigningKeys such that Sentinel can aqcuire
 //! the necessary public signing keys.
+//! The request is passed immutably through sentinel
+//! and is used as a key to group claims and corresponding keys.
+//! When sentinel resolves a threshold on verified and merged message,
+//! it returns the requestor key and the merged message inside that claim.
 
 // extern crate sodiumoxide;
 // extern crate cbor;
@@ -74,6 +78,10 @@ impl<Request, Claim, Name, PublicSignKey> Sentinel<Request, Claim, Name, PublicS
             keys_threshold: keys_threshold
         }
     }
+
+    pub fn add_claim(request : Request, claim : Claim) {}
+
+    pub fn add_keys(request : Request, keys : Vec<(Name, PublicSignKey)>) {}
 
 
 }
