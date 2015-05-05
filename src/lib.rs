@@ -15,6 +15,12 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+//! Sentinel confirms the origin of a claim in a decentralised network.
+//!
+//! A claim has to implement Claimable in order to be verifiable and mergeable.
+//! A request has to implement GetSigningKeys such that Sentinel can aqcuire
+//! the necessary public signing keys.
+
 // extern crate sodiumoxide;
 // extern crate cbor;
 extern crate rustc_serialize;
@@ -22,6 +28,7 @@ extern crate accumulator;
 // mod frequency;
 // use std::collections::HashMap;
 
+use std::sync::mpsc::channel;
 use accumulator::Accumulator;
 // use frequency::Frequency;
 use rustc_serialize::{Decodable, Encodable};
@@ -54,6 +61,10 @@ impl<Request, Claim, Name, PublicSignKey> Sentinel<Request, Claim, Name, PublicS
           Name: Eq + PartialOrd + Ord + Clone,
           // Signature: Clone,
           PublicSignKey: Clone {
+
+    /// This creates a new sentinel that will collect a minimal `claim_threshold` number,
+    /// and every claim has to be verified by `keys_threshold` confirmations of the public
+    /// signing key that signed the corresponding claim.
     pub fn new(claim_threshold: usize, keys_threshold: usize)
         -> Sentinel<Request, Claim, Name, PublicSignKey> {
         Sentinel {
@@ -63,6 +74,8 @@ impl<Request, Claim, Name, PublicSignKey> Sentinel<Request, Claim, Name, PublicS
             keys_threshold: keys_threshold
         }
     }
+
+
 }
 
 /*
