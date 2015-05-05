@@ -43,7 +43,7 @@ pub trait Claimable<Name, PublicSignKey> {
 }
 
 pub trait GetSigningKeys<Name> where Name: Eq + PartialOrd + Ord  + Clone {
-  fn get_signing_keys(&mut self);
+  fn get_signing_keys(&self);
 }
 
 pub struct Sentinel<Request, Claim, Name, Signature, PublicSignKey> // later template also on Signature
@@ -79,15 +79,29 @@ impl<Request, Claim, Name, Signature, PublicSignKey>
         }
     }
 
-    pub fn add_claim(request : Request, name : Name, signature : Signature, claim : Claim)
+    pub fn add_claim(&mut self, request : Request,
+                     claimant : Name, signature : Signature,
+                     claim : Claim)
         // return the Request key and only the merged claim
         // TODO: replace return option with async events pipe to different thread
         -> Option<(Request, Claim)> {
 
+        let keys = match self.keys_accumulator.get(&request) {
+            Some((request, set_of_keys)) => {
+                let claims = self.claim_accumulator.add(request,
+                                  (claimant, signature, claim));
+            }
+            None => {
+                request.get_signing_keys();
+                self.claim_accumulator.add(request, (claimant, signature, claim));
+                return None;
+            }
+        };
+
         None
     }
 
-    pub fn add_keys(request : Request, keys : Vec<(Name, PublicSignKey)>)
+    pub fn add_keys(&mut self, request : Request, keys : Vec<(Name, PublicSignKey)>)
         // return the Request key and only the merged claim
         // TODO: replace return option with async events pipe to different thread
         -> Option<(Request, Claim)> {
