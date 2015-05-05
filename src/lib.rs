@@ -120,11 +120,9 @@ impl<Request, Claim, Name, Signature, PublicSignKey>
             Some((_, set_of_keys)) => {
                 self.claim_accumulator.add(request.clone(), (claimant, signature, claim))
                     .and_then(|(_, claims)|
-                              Sentinel::<Request, _, _, _, _>
-                                      ::validate(&claims, &set_of_keys))
+                              self.validate(&claims, &set_of_keys))
                     .and_then(|verified_claims|
-                              Sentinel::<Request, _, _, _, _>
-                                      ::resolve(&verified_claims))
+                              self.resolve(&verified_claims))
                     .and_then(|merged_claim| return Some((request, merged_claim)))
             },
             None => {
@@ -149,11 +147,9 @@ impl<Request, Claim, Name, Signature, PublicSignKey>
             Some((_, claims)) => {
                 self.keys_accumulator.add(request.clone(), keys)
                     .and_then(|(_, set_of_keys)|
-                              Sentinel::<Request, _, _, _, _>
-                                      ::validate(&claims, &set_of_keys))
+                              self.validate(&claims, &set_of_keys))
                     .and_then(|verified_claims|
-                              Sentinel::<Request, _, _, _, _>
-                                      ::resolve(&verified_claims))
+                              self.resolve(&verified_claims))
                     .and_then(|merged_claim| return Some((request, merged_claim)))
             },
             None => {
@@ -163,15 +159,17 @@ impl<Request, Claim, Name, Signature, PublicSignKey>
         }
     }
 
-    fn validate(claims : &Vec<(Name, Signature, Claim)>,
+    fn validate(&self, claims : &Vec<(Name, Signature, Claim)>,
                 sets_of_keys : &Vec<Vec<(Name, PublicSignKey)>> )
                 -> Option<Vec<Claim>> {
         None
     }
 
-    fn resolve(verified_claims : &Vec<Claim>) -> Option<Claim> {
+    fn resolve(&self, verified_claims : &Vec<Claim>) -> Option<Claim> {
         None
     }
+
+    fn flatten_keys(&self, set_of_keys : &Vec<Vec<(Name, PublicSignKey)>>) {}
 }
 
 /*
