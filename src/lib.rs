@@ -142,6 +142,16 @@ impl<Request, Claim, Name, Signature, PublicSignKey>
 
         None
     }
+
+    fn validate(claims : Vec<(Name, Signature, Claim)>,
+                sets_of_keys : Vec<Vec<(Name, PublicSignKey)>> )
+                -> Option<Vec<Claim>> {
+        None
+    }
+
+    fn resolve(verified_claims : Vec<Claim>) -> Option<Claim> {
+        None
+    }
 }
 
 /*
