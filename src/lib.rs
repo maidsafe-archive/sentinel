@@ -15,46 +15,161 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+//! Sentinel cryptographically confirms the origin of a claim in a decentralised network.
+//!
+//! A claim has to implement Claimable in order to be verifiable and mergeable.
+//! A request has to implement GetSigningKeys such that Sentinel can aqcuire
+//! the necessary public signing keys.
+//! The request is passed immutably through sentinel
+//! and is used as a key to group claims and corresponding keys.
+//! When sentinel resolves a threshold on verified and merged message,
+//! it returns the requestor key and the merged claim.
+//! Claimant names and associated signatures are discarded after succesful resolution,
+//! as such abstracting the original request into a resolved claim.
+//!
+//! The keys_threshold specifies a minimal threshold on the number of independent mentions of
+//! a single public signing key needed to consider it for verifying a claim.  This threshold
+//! can be one or higher.
+//! The claims_threshold specifies a minimal threshold on the number of verified claims before
+//! sentinel will attempt to merge these verified claims.
+
 // extern crate sodiumoxide;
 // extern crate cbor;
+extern crate rustc_serialize;
 extern crate accumulator;
 // mod frequency;
 // use std::collections::HashMap;
-// use sodiumoxide::crypto;
-//
+
+use std::sync::mpsc::channel;
+use accumulator::Accumulator;
 // use frequency::Frequency;
-// use messages::find_group_response::FindGroupResponse;
-// use messages::get_client_key_response::GetKeyResponse;
-// use messages::get_group_key_response::GetGroupKeyResponse;
-// use messages::{MessageTypeTag};
-// use types::{PublicSignKey, SerialisedMessage};
-// use rustc_serialize::{Decodable, Encodable};
+use rustc_serialize::{Decodable, Encodable};
 
-/// Trait for Messages to define their merge behaviour
-// pub trait Mergeable {
-//     fn merge<'a, I>(xs: I) -> Option<Self> where I: Iterator<Item=&'a Self>;
-// }
-
-pub trait Claimable<Name, PublicSignKey> {
-    fn verify(public_key: PublicSignKey, message: &Vec<u8>) -> bool;
+/// The Claim type needs to implement this Claimable trait.
+/// Sentinel will call verify on the claim with the associated signature
+/// and the public signing key that should verify it. Sentinel independently
+/// retrieves these public signing keys through the trait get_signing_keys
+/// on the original request.
+/// When the threshold is reached on a
+pub trait Claimable<Name, Signature, PublicSignKey> {
+    fn verify(signature : Signature, public_key: PublicSignKey) -> bool;
     fn merge<'a, I>(xs: I) -> Option<Self> where I: Iterator<Item=&'a Self>;
-    fn claimant() -> Name;
 }
 
+/// The Request type needs to implement this GetSigningKey trait.
+/// Sentinel will call get_signing_keys() the first time it receives a request
+/// for which it does not yet have any associated keys.
 pub trait GetSigningKeys<Name> where Name: Eq + PartialOrd + Ord  + Clone {
-  fn get_keys(&mut self);
+  fn get_signing_keys(&self);
 }
 
-pub struct Sentinel<Request, Claim, Name, PublicSignKey> // later template also on Signature
+/// Sentinel is templated on an immutable Request type, a mergeable Claim type.
+/// It further takes a Name type to identify claimants.
+/// Signature and PublicSignKey type are auxiliary types to handle a user-chosen
+/// cryptographic signing scheme.
+pub struct Sentinel<Request, Claim, Name, Signature, PublicSignKey> // later template also on Signature
     where Request: GetSigningKeys<Name> + PartialOrd + Ord + Clone,
-          Claim: Clone + Claimable<Name, PublicSignKey>,
+          Claim: Clone + Claimable<Name, Signature, PublicSignKey> + Encodable + Decodable,
           Name: Eq + PartialOrd + Ord + Clone,
-          // Signature: Clone,
+          Signature: Clone,
           PublicSignKey: Clone {
-  claim_accumulator: accumulator::Accumulator<Request, Claim>,
-  keys_accumulator : accumulator::Accumulator<Request, Vec<(Name, PublicSignKey)>>,
-  claim_threshold: u32,
-  keys_threshold: u32
+  claim_accumulator: Accumulator<Request, (Name, Signature, Claim)>,
+  keys_accumulator : Accumulator<Request, Vec<(Name, PublicSignKey)>>,
+  claim_threshold: usize,
+  keys_threshold: usize
+}
+
+impl<Request, Claim, Name, Signature, PublicSignKey>
+    Sentinel<Request, Claim, Name, Signature, PublicSignKey>
+    where Request: GetSigningKeys<Name> + PartialOrd + Ord + Clone,
+          Claim: Clone + Claimable<Name, Signature, PublicSignKey> + Encodable + Decodable,
+          Name: Eq + PartialOrd + Ord + Clone,
+          Signature: Clone,
+          PublicSignKey: Clone {
+    /// This creates a new sentinel that will collect a minimal claim_threshold number
+    /// of verified claims before attempting to merge these claims.
+    /// To obtain a verified claim Sentinel needs to have received a matching public
+    /// signing key. Each such a public signing key needs keys_threshold confirmations
+    /// for it to be considered valid and used for verifying the signature
+    /// of the corresponding claim.
+    pub fn new(claim_threshold: usize, keys_threshold: usize)
+        -> Sentinel<Request, Claim, Name, Signature, PublicSignKey> {
+        Sentinel {
+            claim_accumulator: Accumulator::new(claim_threshold),
+            keys_accumulator: Accumulator::new(keys_threshold),
+            claim_threshold: claim_threshold,
+            keys_threshold: keys_threshold
+        }
+    }
+
+    /// This adds a new claim for the provided request.
+    /// The name and the signature provided will be used to validate the claim
+    /// with the keys that are independently retrieved.
+    /// When an added claim leads to the resolution of the request,
+    /// the request and the verified and merged claim is returned.
+    /// Otherwise None is returned.
+    pub fn add_claim(&mut self, request : Request,
+                     claimant : Name, signature : Signature,
+                     claim : Claim)
+        // return the Request key and only the merged claim
+        // TODO: replace return option with async events pipe to different thread
+        // TODO: code can be cleaned up more even by correcting ownership of Accumulator
+        -> Option<(Request, Claim)> {
+
+        match self.keys_accumulator.get(&request) {
+            Some((_, set_of_keys)) => {
+                self.claim_accumulator.add(request.clone(), (claimant, signature, claim))
+                    .and_then(|(_, claims)|
+                              self.validate(&claims, &set_of_keys))
+                    .and_then(|verified_claims|
+                              self.resolve(&verified_claims))
+                    .and_then(|merged_claim| return Some((request, merged_claim)))
+            },
+            None => {
+                request.get_signing_keys();
+                self.claim_accumulator.add(request, (claimant, signature, claim));
+                return None;
+            }
+        }
+    }
+
+    /// This adds a new set of public_signing_keys for the provided request.
+    /// If the request is not known yet by sentinel, the added keys will be ignored.
+    /// When the added set of keys leads to the resolution of the request,
+    /// the request and the verified and merged claim is returned.
+    /// Otherwise None is returned.
+    pub fn add_keys(&mut self, request : Request, keys : Vec<(Name, PublicSignKey)>)
+        // return the Request key and only the merged claim
+        // TODO: replace return option with async events pipe to different thread
+        -> Option<(Request, Claim)> {
+
+        match self.claim_accumulator.get(&request) {
+            Some((_, claims)) => {
+                self.keys_accumulator.add(request.clone(), keys)
+                    .and_then(|(_, set_of_keys)|
+                              self.validate(&claims, &set_of_keys))
+                    .and_then(|verified_claims|
+                              self.resolve(&verified_claims))
+                    .and_then(|merged_claim| return Some((request, merged_claim)))
+            },
+            None => {
+                // if no corresponding claim exists, refuse to accept keys.
+                return None;
+            }
+        }
+    }
+
+    fn validate(&self, claims : &Vec<(Name, Signature, Claim)>,
+                sets_of_keys : &Vec<Vec<(Name, PublicSignKey)>> )
+                -> Option<Vec<Claim>> {
+        None
+    }
+
+    fn resolve(&self, verified_claims : &Vec<Claim>) -> Option<Claim> {
+        None
+    }
+
+    fn flatten_keys(&self, set_of_keys : &Vec<Vec<(Name, PublicSignKey)>>) {}
 }
 
 /*

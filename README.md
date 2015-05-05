@@ -16,6 +16,8 @@ None
 ##Todo Items
 
 - [x] Restructure generic types
+- [ ] Move Frequency to separate Statistics crate as it is used by Sentinel, but equally by routing for merging messages
+- [ ] Replace return type Option<(Request, MergedMessageFromClaims)> to rx-channel
 
 ##External Todo Items
 
