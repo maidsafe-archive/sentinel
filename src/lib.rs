@@ -63,6 +63,10 @@ pub trait GetSigningKeys<Name> where Name: Eq + PartialOrd + Ord  + Clone {
   fn get_signing_keys(&self);
 }
 
+/// Sentinel is templated on an immutable Request type, a mergeable Claim type.
+/// It further takes a Name type to identify claimants.
+/// Signature and PublicSignKey type are auxiliary types to handle a user-chosen
+/// cryptographic signing scheme.
 pub struct Sentinel<Request, Claim, Name, Signature, PublicSignKey> // later template also on Signature
     where Request: GetSigningKeys<Name> + PartialOrd + Ord + Clone,
           Claim: Clone + Claimable<Name, Signature, PublicSignKey> + Encodable + Decodable,
