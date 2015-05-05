@@ -113,21 +113,26 @@ impl<Request, Claim, Name, Signature, PublicSignKey>
                      claim : Claim)
         // return the Request key and only the merged claim
         // TODO: replace return option with async events pipe to different thread
+        // TODO: code can be cleaned up more even by correcting ownership of Accumulator
         -> Option<(Request, Claim)> {
 
-        let keys = match self.keys_accumulator.get(&request) {
-            Some((keys_request, set_of_keys)) => {
-                let claims = self.claim_accumulator.add(request,
-                                  (claimant, signature, claim));
+        match self.keys_accumulator.get(&request) {
+            Some((_, set_of_keys)) => {
+                self.claim_accumulator.add(request.clone(), (claimant, signature, claim))
+                    .and_then(|(returned_request, claims)|
+                              Sentinel::<Request, _, _, _, _>
+                                      ::validate(&claims, &set_of_keys))
+                    .and_then(|verified_claims|
+                              Sentinel::<Request, _, _, _, _>
+                                      ::resolve(&verified_claims))
+                    .and_then(|merged_claim| return Some((request, merged_claim)))
             },
             None => {
                 request.get_signing_keys();
                 self.claim_accumulator.add(request, (claimant, signature, claim));
                 return None;
             }
-        };
-
-        None
+        }
     }
 
     /// This adds a new set of public_signing_keys for the provided request.
@@ -143,13 +148,13 @@ impl<Request, Claim, Name, Signature, PublicSignKey>
         None
     }
 
-    fn validate(claims : Vec<(Name, Signature, Claim)>,
-                sets_of_keys : Vec<Vec<(Name, PublicSignKey)>> )
+    fn validate(claims : &Vec<(Name, Signature, Claim)>,
+                sets_of_keys : &Vec<Vec<(Name, PublicSignKey)>> )
                 -> Option<Vec<Claim>> {
         None
     }
 
-    fn resolve(verified_claims : Vec<Claim>) -> Option<Claim> {
+    fn resolve(verified_claims : &Vec<Claim>) -> Option<Claim> {
         None
     }
 }
