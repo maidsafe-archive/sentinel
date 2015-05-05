@@ -119,7 +119,7 @@ impl<Request, Claim, Name, Signature, PublicSignKey>
         match self.keys_accumulator.get(&request) {
             Some((_, set_of_keys)) => {
                 self.claim_accumulator.add(request.clone(), (claimant, signature, claim))
-                    .and_then(|(returned_request, claims)|
+                    .and_then(|(_, claims)|
                               Sentinel::<Request, _, _, _, _>
                                       ::validate(&claims, &set_of_keys))
                     .and_then(|verified_claims|
@@ -145,7 +145,22 @@ impl<Request, Claim, Name, Signature, PublicSignKey>
         // TODO: replace return option with async events pipe to different thread
         -> Option<(Request, Claim)> {
 
-        None
+        match self.claim_accumulator.get(&request) {
+            Some((_, claims)) => {
+                self.keys_accumulator.add(request.clone(), keys)
+                    .and_then(|(_, set_of_keys)|
+                              Sentinel::<Request, _, _, _, _>
+                                      ::validate(&claims, &set_of_keys))
+                    .and_then(|verified_claims|
+                              Sentinel::<Request, _, _, _, _>
+                                      ::resolve(&verified_claims))
+                    .and_then(|merged_claim| return Some((request, merged_claim)))
+            },
+            None => {
+                // if no corresponding claim exists, refuse to accept keys.
+                return None;
+            }
+        }
     }
 
     fn validate(claims : &Vec<(Name, Signature, Claim)>,
