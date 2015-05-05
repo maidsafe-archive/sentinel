@@ -82,10 +82,12 @@ impl<Request, Claim, Name, Signature, PublicSignKey>
           Name: Eq + PartialOrd + Ord + Clone,
           Signature: Clone,
           PublicSignKey: Clone {
-
-    /// This creates a new sentinel that will collect a minimal `claim_threshold` number,
-    /// and every claim has to be verified by `keys_threshold` confirmations of the public
-    /// signing key that signed the corresponding claim.
+    /// This creates a new sentinel that will collect a minimal claim_threshold number
+    /// of verified claims before attempting to merge these claims.
+    /// To obtain a verified claim Sentinel needs to have received a matching public
+    /// signing key. Each such a public signing key needs keys_threshold confirmations
+    /// for it to be considered valid and used for verifying the signature
+    /// of the corresponding claim.
     pub fn new(claim_threshold: usize, keys_threshold: usize)
         -> Sentinel<Request, Claim, Name, Signature, PublicSignKey> {
         Sentinel {
@@ -99,6 +101,9 @@ impl<Request, Claim, Name, Signature, PublicSignKey>
     /// This adds a new claim for the provided request.
     /// The name and the signature provided will be used to validate the claim
     /// with the keys that are independently retrieved.
+    /// When an added claim leads to the resolution of the request,
+    /// the request and the verified and merged claim is returned.
+    /// Otherwise None is returned.
     pub fn add_claim(&mut self, request : Request,
                      claimant : Name, signature : Signature,
                      claim : Claim)
@@ -121,6 +126,11 @@ impl<Request, Claim, Name, Signature, PublicSignKey>
         None
     }
 
+    /// This adds a new set of public_signing_keys for the provided request.
+    /// If the request is not known yet by sentinel, the added keys will be ignored.
+    /// When the added set of keys leads to the resolution of the request,
+    /// the request and the verified and merged claim is returned.
+    /// Otherwise None is returned.
     pub fn add_keys(&mut self, request : Request, keys : Vec<(Name, PublicSignKey)>)
         // return the Request key and only the merged claim
         // TODO: replace return option with async events pipe to different thread
