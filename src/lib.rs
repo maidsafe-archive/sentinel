@@ -40,37 +40,37 @@ use rustc_serialize::{Decodable, Encodable};
 pub trait Claimable<Name, PublicSignKey> {
     fn verify(public_key: PublicSignKey, message: &Vec<u8>) -> bool;
     fn merge<'a, I>(xs: I) -> Option<Self> where I: Iterator<Item=&'a Self>;
-    fn claimant() -> Name;
 }
 
 pub trait GetSigningKeys<Name> where Name: Eq + PartialOrd + Ord  + Clone {
   fn get_signing_keys(&mut self);
 }
 
-pub struct Sentinel<Request, Claim, Name, PublicSignKey> // later template also on Signature
+pub struct Sentinel<Request, Claim, Name, Signature, PublicSignKey> // later template also on Signature
     where Request: GetSigningKeys<Name> + PartialOrd + Ord + Clone,
           Claim: Clone + Claimable<Name, PublicSignKey> + Encodable + Decodable,
           Name: Eq + PartialOrd + Ord + Clone,
-          // Signature: Clone,
+          Signature: Clone,
           PublicSignKey: Clone {
-  claim_accumulator: Accumulator<Request, Claim>,
+  claim_accumulator: Accumulator<Request, (Name, Signature, Claim)>,
   keys_accumulator : Accumulator<Request, Vec<(Name, PublicSignKey)>>,
   claim_threshold: usize,
   keys_threshold: usize
 }
 
-impl<Request, Claim, Name, PublicSignKey> Sentinel<Request, Claim, Name, PublicSignKey>
+impl<Request, Claim, Name, Signature, PublicSignKey>
+    Sentinel<Request, Claim, Name, Signature, PublicSignKey>
     where Request: GetSigningKeys<Name> + PartialOrd + Ord + Clone,
           Claim: Clone + Claimable<Name, PublicSignKey> + Encodable + Decodable,
           Name: Eq + PartialOrd + Ord + Clone,
-          // Signature: Clone,
+          Signature: Clone,
           PublicSignKey: Clone {
 
     /// This creates a new sentinel that will collect a minimal `claim_threshold` number,
     /// and every claim has to be verified by `keys_threshold` confirmations of the public
     /// signing key that signed the corresponding claim.
     pub fn new(claim_threshold: usize, keys_threshold: usize)
-        -> Sentinel<Request, Claim, Name, PublicSignKey> {
+        -> Sentinel<Request, Claim, Name, Signature, PublicSignKey> {
         Sentinel {
             claim_accumulator: Accumulator::new(claim_threshold),
             keys_accumulator: Accumulator::new(keys_threshold),
@@ -79,11 +79,21 @@ impl<Request, Claim, Name, PublicSignKey> Sentinel<Request, Claim, Name, PublicS
         }
     }
 
-    pub fn add_claim(request : Request, claim : Claim) {}
+    pub fn add_claim(request : Request, name : Name, signature : Signature, claim : Claim)
+        // return the Request key and only the merged claim
+        // TODO: replace return option with async events pipe to different thread
+        -> Option<(Request, Claim)> {
 
-    pub fn add_keys(request : Request, keys : Vec<(Name, PublicSignKey)>) {}
+        None
+    }
 
+    pub fn add_keys(request : Request, keys : Vec<(Name, PublicSignKey)>)
+        // return the Request key and only the merged claim
+        // TODO: replace return option with async events pipe to different thread
+        -> Option<(Request, Claim)> {
 
+        None
+    }
 }
 
 /*
