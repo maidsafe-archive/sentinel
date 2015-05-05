@@ -23,7 +23,15 @@
 //! The request is passed immutably through sentinel
 //! and is used as a key to group claims and corresponding keys.
 //! When sentinel resolves a threshold on verified and merged message,
-//! it returns the requestor key and the merged message inside that claim.
+//! it returns the requestor key and the merged claim.
+//! Claimant names and associated signatures are discarded after succesful resolution,
+//! as such abstracting the original request into a resolved claim.
+//!
+//! The keys_threshold specifies a minimal threshold on the number of independent mentions of
+//! a single public signing key needed to consider it for verifying a claim.  This threshold
+//! can be one or higher.
+//! The claims_threshold specifies a minimal threshold on the number of verified claims before
+//! sentinel will attempt to merge these verified claims.
 
 // extern crate sodiumoxide;
 // extern crate cbor;
@@ -37,18 +45,27 @@ use accumulator::Accumulator;
 // use frequency::Frequency;
 use rustc_serialize::{Decodable, Encodable};
 
-pub trait Claimable<Name, PublicSignKey> {
-    fn verify(public_key: PublicSignKey, message: &Vec<u8>) -> bool;
+/// The Claim type needs to implement this Claimable trait.
+/// Sentinel will call verify on the claim with the associated signature
+/// and the public signing key that should verify it. Sentinel independently
+/// retrieves these public signing keys through the trait get_signing_keys
+/// on the original request.
+/// When the threshold is reached on a
+pub trait Claimable<Name, Signature, PublicSignKey> {
+    fn verify(signature : Signature, public_key: PublicSignKey) -> bool;
     fn merge<'a, I>(xs: I) -> Option<Self> where I: Iterator<Item=&'a Self>;
 }
 
+/// The Request type needs to implement this GetSigningKey trait.
+/// Sentinel will call get_signing_keys() the first time it receives a request
+/// for which it does not yet have any associated keys.
 pub trait GetSigningKeys<Name> where Name: Eq + PartialOrd + Ord  + Clone {
   fn get_signing_keys(&self);
 }
 
 pub struct Sentinel<Request, Claim, Name, Signature, PublicSignKey> // later template also on Signature
     where Request: GetSigningKeys<Name> + PartialOrd + Ord + Clone,
-          Claim: Clone + Claimable<Name, PublicSignKey> + Encodable + Decodable,
+          Claim: Clone + Claimable<Name, Signature, PublicSignKey> + Encodable + Decodable,
           Name: Eq + PartialOrd + Ord + Clone,
           Signature: Clone,
           PublicSignKey: Clone {
@@ -61,7 +78,7 @@ pub struct Sentinel<Request, Claim, Name, Signature, PublicSignKey> // later tem
 impl<Request, Claim, Name, Signature, PublicSignKey>
     Sentinel<Request, Claim, Name, Signature, PublicSignKey>
     where Request: GetSigningKeys<Name> + PartialOrd + Ord + Clone,
-          Claim: Clone + Claimable<Name, PublicSignKey> + Encodable + Decodable,
+          Claim: Clone + Claimable<Name, Signature, PublicSignKey> + Encodable + Decodable,
           Name: Eq + PartialOrd + Ord + Clone,
           Signature: Clone,
           PublicSignKey: Clone {
@@ -79,6 +96,9 @@ impl<Request, Claim, Name, Signature, PublicSignKey>
         }
     }
 
+    /// This adds a new claim for the provided request.
+    /// The name and the signature provided will be used to validate the claim
+    /// with the keys that are independently retrieved.
     pub fn add_claim(&mut self, request : Request,
                      claimant : Name, signature : Signature,
                      claim : Claim)
@@ -87,10 +107,10 @@ impl<Request, Claim, Name, Signature, PublicSignKey>
         -> Option<(Request, Claim)> {
 
         let keys = match self.keys_accumulator.get(&request) {
-            Some((request, set_of_keys)) => {
+            Some((keys_request, set_of_keys)) => {
                 let claims = self.claim_accumulator.add(request,
                                   (claimant, signature, claim));
-            }
+            },
             None => {
                 request.get_signing_keys();
                 self.claim_accumulator.add(request, (claimant, signature, claim));
