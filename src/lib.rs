@@ -187,8 +187,58 @@ impl<Request, Claim, Name, Signature>
         None
     }
 
-    fn flatten_keys(&self, sets_of_keys : &Vec<Vec<(Name, crypto::sign::PublicKey)>>) {
+    fn flatten_keys(&self, sets_of_keys : &Vec<Vec<(Name, crypto::sign::PublicKey)>>) -> Vec<(Name, Vec<u8>)> {
+        let mut crypto_keys = Vec::<(Name, crypto::sign::PublicKey)>::new();
+        for set_of_keys in sets_of_keys.iter() {
+            for key in set_of_keys.iter() {
+              crypto_keys.push((*key).clone());
+            }
+        }
         
+        let mut all_keys = Vec::new();
+        for i in 0..crypto_keys.len() {
+          all_keys.push((crypto_keys[i].0.clone(), (crypto_keys[i].1).clone().0.to_vec()));
+        }
+
+        all_keys.sort();
+
+        let mut unique_keys = all_keys.clone();
+        let mut counts = Vec::<usize>::new();
+
+        unique_keys.dedup();
+
+        loop {
+            let mut n = 1usize;
+            let key = all_keys.remove(0);
+
+            if all_keys.len() != 0 {
+                while all_keys[0] == key {
+                    n += 1;
+                    all_keys.remove(0);
+                    if all_keys.len() == 0 {
+                        break;
+                    }
+                }
+            }
+            counts.push(n);
+            if all_keys.len() == 0 {
+                break;
+            }
+        }
+
+        assert_eq!(unique_keys.len(), counts.len());
+
+        for i in 1..counts.len() {
+            let mut j = i;
+            while j > 0 && counts[j] > counts[j-1] {
+              counts.swap(j, j-1);
+              unique_keys.swap(j, j-1);
+              j = j-1;
+            }
+        }
+
+        unique_keys.truncate(self.keys_threshold);
+        unique_keys
     }
 }
 
