@@ -172,11 +172,15 @@ impl<Request, Claim, Name>
         }
     }
 
-    fn validate(&self, claims : &Vec<(Name, Signature, Claim)>, sets_of_keys : &Vec<Vec<(Name, PublicKey)>> )
-            -> Option<Vec<Claim>> {
+    fn validate(&self, claims : &Vec<(Name, Signature, Claim)>,
+                       sets_of_keys : &Vec<Vec<(Name, PublicKey)>> ) -> Option<Vec<Claim>> {
 
         let mut verified_claims = Vec::new();
         let keys = self.flatten_keys(sets_of_keys);
+
+        if keys.len() < self.keys_threshold {
+          return None;
+        }
 
         for i in 0..claims.len() {
             for j in 0..keys.len() {
@@ -278,11 +282,17 @@ impl<Request, Claim, Name>
             }
         }
 
+        if counts.len() < self.keys_threshold ||
+           counts[self.keys_threshold - 1] < self.keys_threshold {
+            return Vec::<(Name, PublicKey)>::new();
+        }
+
         unique_keys.truncate(self.keys_threshold);
 
         let mut public_keys = Vec::new();
         for i in 0..unique_keys.len() {
-          public_keys.push((unique_keys[i].0.clone(), self.as_public_key(unique_keys[i].1.clone())));
+          public_keys.push((unique_keys[i].0.clone(),
+                            self.as_public_key(unique_keys[i].1.clone())));
         }
 
         public_keys
@@ -297,7 +307,8 @@ impl<Request, Claim, Name>
         PublicKey(array)
     }
 
-    fn check_signature(&self, signature: &Signature, claim: &Claim, public_key: &PublicKey) -> Option<Claim> {
+    fn check_signature(&self, signature: &Signature, claim: &Claim, public_key: &PublicKey)
+            -> Option<Claim> {
 
         let mut e = cbor::Encoder::from_memory();
         let encoded = e.encode(&[&claim]);
