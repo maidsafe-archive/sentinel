@@ -328,20 +328,22 @@ impl<Request, Claim, Name>
 #[cfg(test)]
 mod test {
 
+    extern crate rustc_serialize;
     use super::*;
+    use rustc_serialize::{Decodable, Encodable};
 
-    #[derive(PartialOrd, Ord, Clone)]
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
     struct TestRequest {
         core : usize
     }
 
-    impl GetSigningKey<usize> for TestRequest {
+    impl GetSigningKeys<usize> for TestRequest {
         fn get_signing_keys(&self) {
             // TODO: can we improve on this now? compared to previous implementation
         }
     }
 
-    #[derive(PartialOrd, Ord, Clone, Encodable, Decodable)]
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
     struct TestClaim {
         value : usize
     }
