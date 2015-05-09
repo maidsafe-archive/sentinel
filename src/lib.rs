@@ -38,11 +38,16 @@
 extern crate rustc_serialize;
 extern crate accumulator;
 extern crate sodiumoxide;
+extern crate cbor;
 
 // mod frequency;
 // use std::collections::HashMap;
 
 use sodiumoxide::crypto;
+use sodiumoxide::crypto::sign::verify_detached;
+use sodiumoxide::crypto::sign::PublicKey;
+use sodiumoxide::crypto::sign::ed25519::Signature;
+use sodiumoxide::crypto::asymmetricbox::curve25519xsalsa20poly1305::PUBLICKEYBYTES;
 // use std::sync::mpsc::channel;
 use accumulator::Accumulator;
 // use frequency::Frequency;
@@ -59,24 +64,22 @@ pub trait GetSigningKeys<Name> where Name: Eq + PartialOrd + Ord  + Clone {
 /// It further takes a Name type to identify claimants.
 /// Signature and PublicSignKey type are auxiliary types to handle a user-chosen
 /// cryptographic signing scheme.
-pub struct Sentinel<Request, Claim, Name, Signature> // later template also on Signature
+pub struct Sentinel<Request, Claim, Name> // later template also on Signature
     where Request: GetSigningKeys<Name> + PartialOrd + Ord + Clone,
           Claim: PartialOrd + Ord + Clone + Encodable + Decodable,
-          Name: Eq + PartialOrd + Ord + Clone,
-          Signature: Clone {
-  claim_accumulator: Accumulator<Request, (Name, Signature, Claim)>,
-  mergeable_claim_accumulator: Accumulator<Request, (Name, Signature, Claim)>,
-  keys_accumulator: Accumulator<Request, Vec<(Name, crypto::sign::PublicKey)>>,
-  claim_threshold: usize,
-  keys_threshold: usize
+          Name: Eq + PartialOrd + Ord + Clone {
+    claim_accumulator: Accumulator<Request, (Name, Signature, Claim)>,
+    mergeable_claim_accumulator: Accumulator<Request, (Name, Signature, Claim)>,
+    keys_accumulator: Accumulator<Request, Vec<(Name, PublicKey)>>,
+    claim_threshold: usize,
+    keys_threshold: usize
 }
 
-impl<Request, Claim, Name, Signature>
-    Sentinel<Request, Claim, Name, Signature>
+impl<Request, Claim, Name>
+    Sentinel<Request, Claim, Name>
     where Request: GetSigningKeys<Name> + PartialOrd + Ord + Clone,
           Claim: PartialOrd + Ord + Clone + Encodable + Decodable,
-          Name: Eq + PartialOrd + Ord + Clone,
-          Signature: Clone {
+          Name: Eq + PartialOrd + Ord + Clone {
     /// This creates a new sentinel that will collect a minimal claim_threshold number
     /// of verified claims before attempting to merge these claims.
     /// To obtain a verified claim Sentinel needs to have received a matching public
@@ -84,7 +87,7 @@ impl<Request, Claim, Name, Signature>
     /// for it to be considered valid and used for verifying the signature
     /// of the corresponding claim.
     pub fn new(claim_threshold: usize, keys_threshold: usize)
-        -> Sentinel<Request, Claim, Name, Signature> {
+        -> Sentinel<Request, Claim, Name> {
         Sentinel {
             claim_accumulator: Accumulator::new(claim_threshold),
             mergeable_claim_accumulator: Accumulator::new(claim_threshold),
@@ -122,30 +125,25 @@ impl<Request, Claim, Name, Signature>
         }
     }
 
-    /// This adds a new claim for the provided request.
-    /// The name and the signature provided will be used to validate the claim
-    /// with the keys that are independently retrieved.
-    /// When an added claim leads to the resolution of the request,
-    /// the request and the verified and merged claim is returned.
-    /// Otherwise None is returned.
+
+    /// This adds a new Claim for a given Request. The Name and the Signature provided are used to
+    /// validate the Claim using independently retrieved sets of public signing keys. Resolution
+    /// optionally returns the Request and median of the Claim's tuple, otherwise None.
     pub fn add_mergeable_claim(&mut self, request : Request,
                                claimant : Name, signature : Signature,
                                claim : Claim)
-        // return the Request key and only the merged claim
-        // TODO: replace return option with async events pipe to different thread
-        // TODO: code can be cleaned up more even by correcting ownership of Accumulator
-        -> Option<(Request, Claim)> {
+            -> Option<(Request, Claim)> {
 
         match self.keys_accumulator.get(&request) {
             Some((_, set_of_keys)) => {
-                self.claim_accumulator.add(request.clone(), (claimant, signature, claim))
+                self.mergeable_claim_accumulator.add(request.clone(), (claimant, signature, claim))
                     .and_then(|(_, claims)| self.validate(&claims, &set_of_keys))
-                    .and_then(|verified_claims| self.resolve(&verified_claims))
+                    .and_then(|mut verified_claims| self.resolve_mergeable(&mut verified_claims))
                     .and_then(|merged_claim| return Some((request, merged_claim)))
             },
             None => {
                 request.get_signing_keys();
-                self.claim_accumulator.add(request, (claimant, signature, claim));
+                self.mergeable_claim_accumulator.add(request, (claimant, signature, claim));
                 return None;
             }
         }
@@ -156,7 +154,7 @@ impl<Request, Claim, Name, Signature>
     /// When the added set of keys leads to the resolution of the request,
     /// the request and the verified and merged claim is returned.
     /// Otherwise None is returned.
-    pub fn add_keys(&mut self, request : Request, keys : Vec<(Name, crypto::sign::PublicKey)>)
+    pub fn add_keys(&mut self, request : Request, keys : Vec<(Name, PublicKey)>)
         // return the Request key and only the merged claim
         // TODO: replace return option with async events pipe to different thread
         -> Option<(Request, Claim)> {
@@ -176,19 +174,67 @@ impl<Request, Claim, Name, Signature>
     }
 
     fn validate(&self, claims : &Vec<(Name, Signature, Claim)>,
-                sets_of_keys : &Vec<Vec<(Name, crypto::sign::PublicKey)>> )
-                -> Option<Vec<Claim>> {
-        // let merged_keys = flatten_keys(sets_of_keys);
-        // claims.iter().merge.(|meregd_keys|)
+                       sets_of_keys : &Vec<Vec<(Name, PublicKey)>> ) -> Option<Vec<Claim>> {
+
+        let mut verified_claims = Vec::new();
+        let keys = self.flatten_keys(sets_of_keys);
+
+        if keys.len() < self.keys_threshold {
+          return None;
+        }
+
+        for i in 0..claims.len() {
+            for j in 0..keys.len() {
+                if claims[i].0 == keys[j].0 {
+                    let claim = self.check_signature(&claims[i].1, &claims[i].2, &keys[j].1);
+                    if claim.is_some() {
+                        verified_claims.push(claim.unwrap().clone());
+                    }
+                    break;
+                }
+            }
+        }
+
+        if verified_claims.len() >= self.claim_threshold {
+          return Some(verified_claims)
+        }
+
         None
     }
 
     fn resolve(&self, verified_claims : &Vec<Claim>) -> Option<Claim> {
+        if verified_claims.len() < self.claim_threshold || !(self.claim_threshold >= 1) {
+            return None;
+        }
+
+        for i in 0..verified_claims.len() {
+            let mut total: usize = 1;
+            for j in 0..verified_claims.len() {
+                if j != i && verified_claims[i] == verified_claims[j] {
+                    total += 1;
+                }
+            }
+
+            if total >= self.claim_threshold {
+                return Some(verified_claims[i].clone());
+            }
+        }
+
         None
     }
 
-    fn flatten_keys(&self, sets_of_keys : &Vec<Vec<(Name, crypto::sign::PublicKey)>>) -> Vec<(Name, Vec<u8>)> {
-        let mut crypto_keys = Vec::<(Name, crypto::sign::PublicKey)>::new();
+    fn resolve_mergeable(&self, verified_claims : &mut Vec<Claim>) -> Option<Claim> {
+        if verified_claims.len() < self.claim_threshold || !(self.claim_threshold >= 1) {
+            return None;
+        }
+
+        verified_claims.sort();
+        let mid = verified_claims.len() / 2;
+        Some(verified_claims[mid].clone())
+    }
+
+    fn flatten_keys(&self, sets_of_keys : &Vec<Vec<(Name, PublicKey)>>) -> Vec<(Name, PublicKey)> {
+        let mut crypto_keys = Vec::<(Name, PublicKey)>::new();
         for set_of_keys in sets_of_keys.iter() {
             for key in set_of_keys.iter() {
               crypto_keys.push((*key).clone());
@@ -237,8 +283,45 @@ impl<Request, Claim, Name, Signature>
             }
         }
 
+        if counts.len() < self.keys_threshold ||
+           counts[self.keys_threshold - 1] < self.keys_threshold {
+            return Vec::<(Name, PublicKey)>::new();
+        }
+
         unique_keys.truncate(self.keys_threshold);
-        unique_keys
+
+        let mut public_keys = Vec::new();
+        for i in 0..unique_keys.len() {
+          public_keys.push((unique_keys[i].0.clone(),
+                            self.as_public_key(unique_keys[i].1.clone())));
+        }
+
+        public_keys
+    }
+
+    fn as_public_key(&self, vector: Vec<u8>) -> PublicKey {
+
+        let mut array = [0u8; PUBLICKEYBYTES];
+        for i in 0..PUBLICKEYBYTES {
+          array[i] = vector[i];
+        }
+        PublicKey(array)
+    }
+
+    fn check_signature(&self, signature: &Signature, claim: &Claim, public_key: &PublicKey)
+            -> Option<Claim> {
+
+        let mut e = cbor::Encoder::from_memory();
+        let encoded = e.encode(&[&claim]);
+
+        if encoded.is_ok() {
+            let valid = crypto::sign::verify_detached(&signature, &e.as_bytes(), &public_key);
+
+            if valid { return Some(claim.clone()); }
+            return None;
+        }
+
+        None
     }
 }
 
