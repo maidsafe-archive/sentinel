@@ -122,7 +122,7 @@ impl<Request, Claim, Name, Signature>
         }
     }
 
-     /// This adds a new claim for the provided request.
+    /// This adds a new claim for the provided request.
     /// The name and the signature provided will be used to validate the claim
     /// with the keys that are independently retrieved.
     /// When an added claim leads to the resolution of the request,
@@ -194,7 +194,7 @@ impl<Request, Claim, Name, Signature>
               crypto_keys.push((*key).clone());
             }
         }
-        
+
         let mut all_keys = Vec::new();
         for i in 0..crypto_keys.len() {
           all_keys.push((crypto_keys[i].0.clone(), (crypto_keys[i].1).clone().0.to_vec()));
@@ -240,6 +240,29 @@ impl<Request, Claim, Name, Signature>
         unique_keys.truncate(self.keys_threshold);
         unique_keys
     }
+}
+
+#[cfg(test)]
+mod test {
+
+    use super::*;
+
+    #[derive(PartialOrd, Ord, Clone)]
+    struct TestRequest {
+        core : usize
+    }
+
+    impl GetSigningKey<usize> for TestRequest {
+        fn get_signing_keys(&self) {
+            // TODO: can we improve on this now? compared to previous implementation
+        }
+    }
+
+    #[derive(PartialOrd, Ord, Clone, Encodable, Decodable)]
+    struct TestClaim {
+        value : usize
+    }
+
 }
 
 /*
