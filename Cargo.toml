@@ -17,3 +17,6 @@ cbor = "*"
 sodiumoxide = "0.0.4"
 rand = "*"
 accumulator = "0.0.1"
+
+[dependencies.flow]
+git = "https://github.com/benjaminbollen/flow.git"
