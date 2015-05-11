@@ -44,3 +44,4 @@ extern crate flow;
 /// Sentinel provides a consensus mechanism on all content messages.
 /// The claims made must be identical and cryptographically signed.
 pub mod sentinel;
+pub mod account_sentinel;

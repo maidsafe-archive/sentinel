@@ -121,6 +121,30 @@ impl<'a, Request, Claim, Name>
         }
     }
 
+
+    /// This adds a new Claim for a given Request. The Name and the Signature provided are used to
+    /// validate the Claim using independently retrieved sets of public signing keys. Resolution
+    /// optionally returns the Request and median of the Claim's tuple, otherwise None.
+    pub fn add_mergeable_claim(&mut self, request : Request,
+                               claimant : Name, signature : Signature,
+                               claim : Claim)
+            -> Option<(Request, Claim)> {
+
+        match self.keys_accumulator.get(&request) {
+            Some((_, set_of_keys)) => {
+                self.mergeable_claim_accumulator.add(request.clone(), (claimant, signature, claim))
+                    .and_then(|(_, claims)| self.validate(&claims, &set_of_keys))
+                    .and_then(|mut verified_claims| self.resolve_mergeable(&mut verified_claims))
+                    .and_then(|merged_claim| return Some((request, merged_claim)))
+            },
+            None => {
+                request.get_signing_keys();
+                self.mergeable_claim_accumulator.add(request, (claimant, signature, claim));
+                return None;
+            }
+        }
+    }
+
     /// This adds a new set of public_signing_keys for the provided request.
     /// If the request is not known yet by sentinel, the added keys will be ignored.
     /// When the added set of keys leads to the resolution of the request,
@@ -195,6 +219,16 @@ impl<'a, Request, Claim, Name>
         None
     }
 
+    fn resolve_mergeable(&self, verified_claims : &mut Vec<Claim>) -> Option<Claim> {
+        if verified_claims.len() < self.claim_threshold || !(self.claim_threshold >= 1) {
+            return None;
+        }
+
+        verified_claims.sort();
+        let mid = verified_claims.len() / 2;
+        Some(verified_claims[mid].clone())
+    }
+
     fn flatten_keys(&self, sets_of_keys : &Vec<Vec<(Name, PublicKey)>>) -> Vec<(Name, PublicKey)> {
         // let mut frequency = Frequency::new();
         //
@@ -221,29 +255,4 @@ impl<'a, Request, Claim, Name>
 
         None
     }
-}
-
-#[cfg(test)]
-mod test {
-
-    extern crate rustc_serialize;
-    use super::*;
-    use rustc_serialize::{Decodable, Encodable};
-
-    #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
-    struct TestRequest {
-        core : usize
-    }
-
-    impl GetSigningKeys<usize> for TestRequest {
-        fn get_signing_keys(&self) {
-            // TODO: can we improve on this now? compared to previous implementation
-        }
-    }
-
-    #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
-    struct TestClaim {
-        value : usize
-    }
-
 }
