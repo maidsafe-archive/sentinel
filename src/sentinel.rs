@@ -36,7 +36,7 @@
 use super::{SerialisedClaim};
 
 use flow::frequency::Frequency;
-// use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use sodiumoxide::crypto;
 use sodiumoxide::crypto::sign::verify_detached;
@@ -44,7 +44,6 @@ use sodiumoxide::crypto::sign::PublicKey;
 use sodiumoxide::crypto::sign::Signature;
 // use std::sync::mpsc::channel;
 use accumulator::Accumulator;
-// use rustc_serialize::{Decodable, Encodable};
 
 
 /// The Request type needs to implement this GetSigningKey trait.
@@ -63,7 +62,7 @@ pub trait Source<Name> where Name: Eq + PartialOrd + Ord  + Clone {
 /// Signature and PublicSignKey type are auxiliary types to handle a user-chosen
 /// cryptographic signing scheme.
 pub struct Sentinel<'a, Request, Name> // later template also on Signature
-    where Request: PartialOrd + Ord + Clone + Source,
+    where Request: Eq + PartialOrd + Ord + Clone + Source<Name>,
           Name: Eq + PartialOrd + Ord + Clone {
     sender: &'a mut (GetSigningKeys<Name> + 'a),
     claim_accumulator: Accumulator<Request, (Name, Signature, SerialisedClaim)>,
@@ -74,7 +73,7 @@ pub struct Sentinel<'a, Request, Name> // later template also on Signature
 
 impl<'a, Request, Name>
     Sentinel<'a, Request, Name>
-    where Request: PartialOrd + Ord + Clone + Source,
+    where Request: Eq + PartialOrd + Ord + Clone + Source<Name>,
           Name: Eq + PartialOrd + Ord + Clone {
     /// This creates a new sentinel that will collect a minimal claim_threshold number
     /// of verified claims before attempting to merge these claims.
@@ -82,7 +81,7 @@ impl<'a, Request, Name>
     /// signing key. Each such a public signing key needs keys_threshold confirmations
     /// for it to be considered valid and used for verifying the signature
     /// of the corresponding claim.
-    pub fn new(sender: &'a mut GetSigningKeys, claim_threshold: usize, keys_threshold: usize)
+    pub fn new(sender: &'a mut GetSigningKeys<Name>, claim_threshold: usize, keys_threshold: usize)
         -> Sentinel<'a, Request, Name> {
         Sentinel {
             sender: sender,
@@ -98,7 +97,7 @@ impl<'a, Request, Name>
     /// with the keys that are independently retrieved.
     /// When an added claim leads to the resolution of the request,
     /// the request and the claim are returned.
-    /// All claims have to be identical.
+    /// All resolved claims have to be identical.
     /// Otherwise None is returned.
     pub fn add_claim(&mut self, request : Request,
                      claimant : Name, signature : Signature,
@@ -151,19 +150,18 @@ impl<'a, Request, Name>
     fn validate(&self, claims : &Vec<(Name, Signature, SerialisedClaim)>,
                        sets_of_keys : &Vec<Vec<(Name, PublicKey)>> ) -> Option<Vec<SerialisedClaim>> {
 
-        let mut verified_claims = Vec::new();
-        let keys = Sentinel::flatten_keys(sets_of_keys);
+        let keys = self.flatten_keys(sets_of_keys);
 
         let verified_claims = claims.iter()
             .filter_map(|claim| {
                 keys.get(&claim.0)
-                    .and_then(|public_key| Sentinel::check_signature(&claim.1,
-                                                                     &public_key,
-                                                                     &claim.2))})
+                    .and_then(|public_key| super::check_signature(&claim.1,
+                                                                  &public_key,
+                                                                  &claim.2))})
             .collect::<Vec<_>>();
 
         if verified_claims.len() >= self.claim_threshold {
-          return Some(verified_claims)
+            return Some(verified_claims)
         }
 
         None
@@ -190,7 +188,16 @@ impl<'a, Request, Name>
         None
     }
 
-
+    fn flatten_keys(&self, sets_of_keys : &Vec<Vec<(Name, PublicKey)>>) -> BTreeMap<Name, PublicKey> {
+        // let mut frequency = Frequency::new();
+        //
+        // for keys in sets_of_keys {
+        //     for key in keys {
+        //         frequency.update(&key.1);
+        //     }
+        // }
+        BTreeMap::new()
+    }
 }
 
 #[cfg(test)]
@@ -206,7 +213,7 @@ mod test {
     }
 
     impl GetSigningKeys<usize> for TestRequest {
-        fn get_signing_keys(&self) {
+        fn get_signing_keys(&self, source: usize) {
             // TODO: can we improve on this now? compared to previous implementation
         }
     }

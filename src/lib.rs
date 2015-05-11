@@ -33,13 +33,16 @@
 //! The claims_threshold specifies a minimal threshold on the number of verified claims before
 //! sentinel will attempt to merge these verified claims.
 
-// extern crate sodiumoxide;
-// extern crate cbor;
 extern crate rustc_serialize;
 extern crate accumulator;
 extern crate sodiumoxide;
 extern crate cbor;
 extern crate flow;
+
+use sodiumoxide::crypto;
+use sodiumoxide::crypto::sign::verify_detached;
+use sodiumoxide::crypto::sign::PublicKey;
+use sodiumoxide::crypto::sign::Signature;
 
 pub type SerialisedClaim = Vec<u8>;
 
@@ -57,15 +60,4 @@ fn check_signature(signature: &Signature, public_key: &PublicKey, claim: &Serial
         true => Some(claim.clone()),
         false => None
     }
-}
-
-fn flatten_keys(sets_of_keys : &Vec<Vec<(Name, PublicKey)>>) -> Vec<(Name, PublicKey)> {
-    // let mut frequency = Frequency::new();
-    //
-    // for keys in sets_of_keys {
-    //     for key in keys {
-    //         frequency.update(&key.1);
-    //     }
-    // }
-    vec![]
 }
