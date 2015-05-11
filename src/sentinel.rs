@@ -33,14 +33,15 @@
 //! The claims_threshold specifies a minimal threshold on the number of verified claims before
 //! sentinel will attempt to merge these verified claims.
 
+use super::{SerialisedClaim};
+
 use flow::frequency::Frequency;
 // use std::collections::HashMap;
 
 use sodiumoxide::crypto;
 use sodiumoxide::crypto::sign::verify_detached;
 use sodiumoxide::crypto::sign::PublicKey;
-use sodiumoxide::crypto::sign::ed25519::Signature;
-use sodiumoxide::crypto::asymmetricbox::curve25519xsalsa20poly1305::PUBLICKEYBYTES;
+use sodiumoxide::crypto::sign::Signature;
 // use std::sync::mpsc::channel;
 use accumulator::Accumulator;
 // use rustc_serialize::{Decodable, Encodable};
@@ -64,8 +65,8 @@ pub trait Source<Name> where Name: Eq + PartialOrd + Ord  + Clone {
 pub struct Sentinel<'a, Request, Name> // later template also on Signature
     where Request: PartialOrd + Ord + Clone + Source,
           Name: Eq + PartialOrd + Ord + Clone {
-    sender: &'a mut (GetSigningKeys + 'a),
-    claim_accumulator: Accumulator<Request, (Name, Signature, Claim)>,
+    sender: &'a mut (GetSigningKeys<Name> + 'a),
+    claim_accumulator: Accumulator<Request, (Name, Signature, SerialisedClaim)>,
     keys_accumulator: Accumulator<Request, Vec<(Name, PublicKey)>>,
     claim_threshold: usize,
     keys_threshold: usize
@@ -81,7 +82,7 @@ impl<'a, Request, Name>
     /// signing key. Each such a public signing key needs keys_threshold confirmations
     /// for it to be considered valid and used for verifying the signature
     /// of the corresponding claim.
-    pub fn new(sender: &'a mut get_signing_keys, claim_threshold: usize, keys_threshold: usize)
+    pub fn new(sender: &'a mut GetSigningKeys, claim_threshold: usize, keys_threshold: usize)
         -> Sentinel<'a, Request, Name> {
         Sentinel {
             sender: sender,
@@ -145,30 +146,21 @@ impl<'a, Request, Name>
         }
     }
 
-    fn validate(&self, claims : &Vec<(Name, Signature)>, serialised_claim : &SerialisedClaim,
+    /// Validate is only concerned with checking the signatures of the serialised claims.
+    /// To achieve this it pairs up a set of signed claims and a set of public signing keys.
+    fn validate(&self, claims : &Vec<(Name, Signature, SerialisedClaim)>,
                        sets_of_keys : &Vec<Vec<(Name, PublicKey)>> ) -> Option<Vec<SerialisedClaim>> {
 
         let mut verified_claims = Vec::new();
+        let keys = Sentinel::flatten_keys(sets_of_keys);
 
-
-        let keys = self.flatten_keys(sets_of_keys);
-
-
-        if keys.len() < self.keys_threshold {
-          return None;
-        }
-
-        for i in 0..claims.len() {
-            for j in 0..keys.len() {
-                if claims[i].0 == keys[j].0 {
-                    let claim = self.check_signature(&claims[i].1, &claims[i].2, &keys[j].1);
-                    if claim.is_some() {
-                        verified_claims.push(claim.unwrap().clone());
-                    }
-                    break;
-                }
-            }
-        }
+        let verified_claims = claims.iter()
+            .filter_map(|claim| {
+                keys.get(&claim.0)
+                    .and_then(|public_key| Sentinel::check_signature(&claim.1,
+                                                                     &public_key,
+                                                                     &claim.2))})
+            .collect::<Vec<_>>();
 
         if verified_claims.len() >= self.claim_threshold {
           return Some(verified_claims)
@@ -177,7 +169,7 @@ impl<'a, Request, Name>
         None
     }
 
-    fn resolve(&self, verified_claims : &Vec<Claim>) -> Option<Claim> {
+    fn resolve(&self, verified_claims : &Vec<SerialisedClaim>) -> Option<SerialisedClaim> {
         if verified_claims.len() < self.claim_threshold || !(self.claim_threshold >= 1) {
             return None;
         }
@@ -198,32 +190,7 @@ impl<'a, Request, Name>
         None
     }
 
-    fn flatten_keys(&self, sets_of_keys : &Vec<Vec<(Name, PublicKey)>>) -> Vec<(Name, PublicKey)> {
-        // let mut frequency = Frequency::new();
-        //
-        // for keys in sets_of_keys {
-        //     for key in keys {
-        //         frequency.update(&key.1);
-        //     }
-        // }
-        vec![]
-    }
 
-    fn check_signature(&self, signature: &Signature, claim: &Claim, public_key: &PublicKey)
-            -> Option<Claim> {
-
-        // let mut e = cbor::Encoder::from_memory();
-        // let encoded = e.encode(&[&claim]);
-        //
-        // if encoded.is_ok() {
-        //     let valid = crypto::sign::verify_detached(&signature, &e.as_bytes(), &public_key);
-        //
-        //     if valid { return Some(claim.clone()); }
-        //     return None;
-        // }
-
-        None
-    }
 }
 
 #[cfg(test)]

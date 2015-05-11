@@ -46,4 +46,26 @@ pub type SerialisedClaim = Vec<u8>;
 /// Sentinel provides a consensus mechanism on all content messages.
 /// The claims made must be identical and cryptographically signed.
 pub mod sentinel;
-pub mod account_sentinel;
+// pub mod account_sentinel;
+
+fn check_signature(signature: &Signature, public_key: &PublicKey, claim: &SerialisedClaim)
+        -> Option<SerialisedClaim> {
+
+    match crypto::sign::verify_detached(&signature,
+                                        claim,
+                                        public_key) {
+        true => Some(claim.clone()),
+        false => None
+    }
+}
+
+fn flatten_keys(sets_of_keys : &Vec<Vec<(Name, PublicKey)>>) -> Vec<(Name, PublicKey)> {
+    // let mut frequency = Frequency::new();
+    //
+    // for keys in sets_of_keys {
+    //     for key in keys {
+    //         frequency.update(&key.1);
+    //     }
+    // }
+    vec![]
+}
