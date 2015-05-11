@@ -35,7 +35,7 @@
 
 use super::{SerialisedClaim};
 
-use flow::frequency::Frequency;
+use flow::frequency_dedup::FrequencyDedup;
 use std::collections::BTreeMap;
 
 use sodiumoxide::crypto;
@@ -189,13 +189,20 @@ impl<'a, Request, Name>
     }
 
     fn flatten_keys(&self, sets_of_keys : &Vec<Vec<(Name, PublicKey)>>) -> BTreeMap<Name, PublicKey> {
-        // let mut frequency = Frequency::new();
-        //
-        // for keys in sets_of_keys {
-        //     for key in keys {
-        //         frequency.update(&key.1);
-        //     }
-        // }
+        let mut frequency = FrequencyDedup::new();
+
+        for keys in sets_of_keys {
+            for key in keys {
+                frequency.update(&key.0, &key.1);
+            }
+        }
+
+        // retrieve all name and key combinations with a count,
+        // and cut off at threshold
+        let mut counted_keys = frequency.sort_by_highest().into_iter()
+            .filter(|&(_, _, ref count)| *count >= self.keys_threshold)
+            .collect::<Vec<_>>();
+
         BTreeMap::new()
     }
 }
