@@ -97,7 +97,8 @@ impl<'a, Request, Claim, Name>
     /// The name and the signature provided will be used to validate the claim
     /// with the keys that are independently retrieved.
     /// When an added claim leads to the resolution of the request,
-    /// the request and the verified median of the claims are returned.
+    /// the request and the claim are returned.
+    /// All claims have to be identical.
     /// Otherwise None is returned.
     pub fn add_claim(&mut self, request : Request,
                      claimant : Name, signature : Signature,
@@ -114,7 +115,7 @@ impl<'a, Request, Claim, Name>
                     .and_then(|merged_claim| return Some((request, merged_claim)))
             },
             None => {
-                self.sender.get_signing_keys();
+                self.sender.get_signing_keys(request.get_source());
                 self.claim_accumulator.add(request, (claimant, signature, claim));
                 return None;
             }
