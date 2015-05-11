@@ -188,7 +188,8 @@ impl<'a, Request, Name>
         None
     }
 
-    fn flatten_keys(&self, sets_of_keys : &Vec<Vec<(Name, PublicKey)>>) -> BTreeMap<Name, PublicKey> {
+    fn flatten_keys(&self, sets_of_keys : &Vec<Vec<(Name, PublicKey)>>)
+        -> BTreeMap<Name, PublicKey> {
         let mut frequency = FrequencyDedup::new();
 
         for keys in sets_of_keys {
@@ -198,12 +199,12 @@ impl<'a, Request, Name>
         }
 
         // retrieve all name and key combinations with a count,
-        // and cut off at threshold
-        let mut counted_keys = frequency.sort_by_highest().into_iter()
+        // and cut off at threshold.
+        // Frequency resolves duplication conflicts internally
+        frequency.sort_by_highest().into_iter()
             .filter(|&(_, _, ref count)| *count >= self.keys_threshold)
-            .collect::<Vec<_>>();
-
-        BTreeMap::new()
+            .map(|(name, public_key, _)| (name, public_key))
+            .collect::<BTreeMap<Name, PublicKey>>()
     }
 }
 
