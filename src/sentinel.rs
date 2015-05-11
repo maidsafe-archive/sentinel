@@ -45,6 +45,7 @@ use sodiumoxide::crypto::asymmetricbox::curve25519xsalsa20poly1305::PUBLICKEYBYT
 use accumulator::Accumulator;
 // use rustc_serialize::{Decodable, Encodable};
 
+
 /// The Request type needs to implement this GetSigningKey trait.
 /// Sentinel will call get_signing_keys() the first time it receives a request
 /// for which it does not yet have any associated keys.
@@ -60,9 +61,8 @@ pub trait Source<Name> where Name: Eq + PartialOrd + Ord  + Clone {
 /// It further takes a Name type to identify claimants.
 /// Signature and PublicSignKey type are auxiliary types to handle a user-chosen
 /// cryptographic signing scheme.
-pub struct Sentinel<'a, Request, Claim, Name> // later template also on Signature
+pub struct Sentinel<'a, Request, Name> // later template also on Signature
     where Request: PartialOrd + Ord + Clone + Source,
-          Claim: PartialEq + Eq + Clone,
           Name: Eq + PartialOrd + Ord + Clone {
     sender: &'a mut (GetSigningKeys + 'a),
     claim_accumulator: Accumulator<Request, (Name, Signature, Claim)>,
@@ -71,10 +71,9 @@ pub struct Sentinel<'a, Request, Claim, Name> // later template also on Signatur
     keys_threshold: usize
 }
 
-impl<'a, Request, Claim, Name>
-    Sentinel<'a, Request, Claim, Name>
+impl<'a, Request, Name>
+    Sentinel<'a, Request, Name>
     where Request: PartialOrd + Ord + Clone + Source,
-          Claim: PartialOrd + Ord + Clone,
           Name: Eq + PartialOrd + Ord + Clone {
     /// This creates a new sentinel that will collect a minimal claim_threshold number
     /// of verified claims before attempting to merge these claims.
@@ -83,7 +82,7 @@ impl<'a, Request, Claim, Name>
     /// for it to be considered valid and used for verifying the signature
     /// of the corresponding claim.
     pub fn new(sender: &'a mut get_signing_keys, claim_threshold: usize, keys_threshold: usize)
-        -> Sentinel<'a, Request, Claim, Name> {
+        -> Sentinel<'a, Request, Name> {
         Sentinel {
             sender: sender,
             claim_accumulator: Accumulator::new(claim_threshold),
@@ -102,10 +101,10 @@ impl<'a, Request, Claim, Name>
     /// Otherwise None is returned.
     pub fn add_claim(&mut self, request : Request,
                      claimant : Name, signature : Signature,
-                     claim : Claim)
+                     claim : SerialisedClaim)
         // TODO: replace return option with async events pipe to different thread
         // TODO: code can be cleaned up more even by correcting ownership of Accumulator
-        -> Option<(Request, Claim)> {
+        -> Option<(Request, SerialisedClaim)> {
 
         match self.keys_accumulator.get(&request) {
             Some((_, set_of_keys)) => {
@@ -130,7 +129,7 @@ impl<'a, Request, Claim, Name>
     pub fn add_keys(&mut self, request : Request, keys : Vec<(Name, PublicKey)>)
         // return the Request key and only the merged claim
         // TODO: replace return option with async events pipe to different thread
-        -> Option<(Request, Claim)> {
+        -> Option<(Request, SerialisedClaim)> {
 
         match self.claim_accumulator.get(&request) {
             Some((_, claims)) => {
@@ -146,11 +145,14 @@ impl<'a, Request, Claim, Name>
         }
     }
 
-    fn validate(&self, claims : &Vec<(Name, Signature, Claim)>,
-                       sets_of_keys : &Vec<Vec<(Name, PublicKey)>> ) -> Option<Vec<Claim>> {
+    fn validate(&self, claims : &Vec<(Name, Signature)>, serialised_claim : &SerialisedClaim,
+                       sets_of_keys : &Vec<Vec<(Name, PublicKey)>> ) -> Option<Vec<SerialisedClaim>> {
 
         let mut verified_claims = Vec::new();
+
+
         let keys = self.flatten_keys(sets_of_keys);
+
 
         if keys.len() < self.keys_threshold {
           return None;
