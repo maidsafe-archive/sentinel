@@ -36,7 +36,7 @@
 use super::{SerialisedClaim};
 
 use flow::frequency::Frequency;
-use flow::frequency_dedup::FrequencyDedup;
+use flow::frequency_key_value::FrequencyKeyValue;
 use std::collections::BTreeMap;
 
 use sodiumoxide::crypto;
@@ -156,10 +156,19 @@ impl<'a, Request, Name>
         let verified_claims = claims.iter()
             .filter_map(|claim| {
                 keys.get(&claim.0)
-                    .and_then(|public_key| super::check_signature(&claim.1,
-                                                                  &public_key,
-                                                                  &claim.2))})
-            .collect::<Vec<_>>();
+                    .and_then(|public_keys| {
+                        for public_key in public_keys{
+                            match super::check_signature(&claim.1,
+                                                         &public_key,
+                                                         &claim.2) {
+                                Some(claim) => return Some(claim),
+                                None => continue
+                            }
+                        };
+                        None
+                     })
+            })
+            .collect::<Vec<SerialisedClaim>>();
 
         if verified_claims.len() >= self.claim_threshold {
             return Some(verified_claims)
@@ -189,10 +198,11 @@ impl<'a, Request, Name>
     }
 
     fn flatten_keys(&self, sets_of_keys : &Vec<Vec<(Name, PublicKey)>>)
-        -> BTreeMap<Name, PublicKey> {
-        // Key, Value Frequency where conflicting values for one key
-        // are resolved on the most frequent value.
-        let mut frequency = FrequencyDedup::new();
+        -> BTreeMap<Name, Vec<PublicKey>> {
+        // Key, Value Frequency counts a two-level depth tree of key-values
+        // where the occurance of key is the maximum over all value occurances
+        // for that key.
+        let mut frequency = FrequencyKeyValue::new();
 
         for keys in sets_of_keys {
             for key in keys {
@@ -205,8 +215,12 @@ impl<'a, Request, Name>
         // Frequency resolves duplication conflicts internally
         frequency.sort_by_highest().into_iter()
             .filter(|&(_, _, ref count)| *count >= self.keys_threshold)
-            .map(|(name, public_key, _)| (name, public_key))
-            .collect::<BTreeMap<Name, PublicKey>>()
+            .map(|(name, public_keys, _)| {
+                (name, public_keys.into_iter()
+                                  .filter(|&(_, ref count)| *count >= self.keys_threshold)
+                                  .map(|(public_key, _)| public_key)
+                                  .collect::<Vec<PublicKey>>())})
+            .collect::<BTreeMap<Name, Vec<PublicKey>>>()
     }
 }
 
