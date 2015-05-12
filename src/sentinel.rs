@@ -35,6 +35,7 @@
 
 use super::{SerialisedClaim};
 
+use flow::frequency::Frequency;
 use flow::frequency_dedup::FrequencyDedup;
 use std::collections::BTreeMap;
 
@@ -168,28 +169,29 @@ impl<'a, Request, Name>
     }
 
     fn resolve(&self, verified_claims : &Vec<SerialisedClaim>) -> Option<SerialisedClaim> {
-        if verified_claims.len() < self.claim_threshold || !(self.claim_threshold >= 1) {
-            return None;
+        let mut frequency = Frequency::new();
+        for verified_claim in verified_claims {
+            frequency.update(&verified_claim)
         }
 
-        for i in 0..verified_claims.len() {
-            let mut total: usize = 1;
-            for j in 0..verified_claims.len() {
-                if j != i && verified_claims[i] == verified_claims[j] {
-                    total += 1;
-                }
-            }
+        let resolved_claims = frequency.sort_by_highest().into_iter()
+            .filter(|&(_, ref count)| *count >= self.claim_threshold)
+            .map(|(resolved_claim, _)| resolved_claim)
+            .collect::<Vec<&SerialisedClaim>>();
+        assert_eq!(resolved_claims.len(), 1);
 
-            if total >= self.claim_threshold {
-                return Some(verified_claims[i].clone());
-            }
-        }
-
-        None
+        let resolved_claim : Option<SerialisedClaim>
+            = match resolved_claims.first() {
+            Some(&serialised_claim) => Some(serialised_claim.clone()),
+            None => None
+        };
+        resolved_claim
     }
 
     fn flatten_keys(&self, sets_of_keys : &Vec<Vec<(Name, PublicKey)>>)
         -> BTreeMap<Name, PublicKey> {
+        // Key, Value Frequency where conflicting values for one key
+        // are resolved on the most frequent value.
         let mut frequency = FrequencyDedup::new();
 
         for keys in sets_of_keys {
