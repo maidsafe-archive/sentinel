@@ -4,8 +4,6 @@
 
 **Secondary Maintainer:**   Benjamin Bollen (benjamin.bollen@maidsafe.net)
 
-Confirm group based consensus on messages in a p2p network
-
 |Crate|Travis|Windows|OSX|Coverage|
 |:------:|:-------:|:-------:|:-------:|:-------:|
 |[![](http://meritbadge.herokuapp.com/sentinel)](https://crates.io/crates/sentinel)|[![Build Status](https://travis-ci.org/maidsafe/sentinel.svg?branch=master)](https://travis-ci.org/maidsafe/sentinel)| [![Build Status](http://ci.maidsafe.net:8080/buildStatus/icon?job=sentinel_win64_status_badge)](http://ci.maidsafe.net:8080/job/sentinel_win64_status_badge/)|[![Build Status](http://ci.maidsafe.net:8080/buildStatus/icon?job=sentinel_osx_status_badge)](http://ci.maidsafe.net:8080/job/sentinel_osx_status_badge/)|[![Coverage Status](https://coveralls.io/repos/dirvine/sentinel/badge.svg)](https://coveralls.io/r/dirvine/sentinel)|
@@ -13,11 +11,10 @@ Confirm group based consensus on messages in a p2p network
 | [API Documentation](http://maidsafe.github.io/sentinel/sentinel/)| [MaidSafe System Documention](http://systemdocs.maidsafe.net/) | [MaidSafe web site](http://www.maidsafe.net) | [Safe Community site](https://forum.safenetwork.io) |
 
 #Overview
+Confirm group based consensus on messages in a p2p network
 
-###Pre-requisite:
-None
+#Todo Items
 
-##Todo Items
 ## [0.0.2] Implement the three sentinels
 - [ ] [MAID-1061](https://maidsafe.atlassian.net/browse/MAID-1061) Move Frequency back here into this crate
 - [ ] [MAID-1022](https://maidsafe.atlassian.net/browse/MAID-1022) Implement KeyStore
