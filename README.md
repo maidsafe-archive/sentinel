@@ -17,7 +17,7 @@ Confirm group based consensus on messages in a p2p network
 
 ## [0.0.2] Implement the three sentinels
 - [ ] [MAID-1061](https://maidsafe.atlassian.net/browse/MAID-1061) Move Frequency back here into this crate
-- [ ] [MAID-1074](https://maidsafe.atlassian.net/browse/MAID-1074) Remove dependency for the custom fork of sodiumdioxide library
+- [ ] [MAID-1074](https://maidsafe.atlassian.net/browse/MAID-1074) Remove dependency on the custom fork of the sodiumdioxide library
 - [ ] [MAID-1022](https://maidsafe.atlassian.net/browse/MAID-1022) Implement KeyStore
 - [ ] [MAID-1023](https://maidsafe.atlassian.net/browse/MAID-1023) Test KeyStore
 - [ ] [MAID-1024](https://maidsafe.atlassian.net/browse/MAID-1024) Implement PureSentinel
