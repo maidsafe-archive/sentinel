@@ -18,12 +18,13 @@ Confirm group based consensus on messages in a p2p network
 None
 
 ##Todo Items
+- [ ] Move Frequency back here into this crate
+- [ ] Implement KeyStore
+- [ ] Test KeyStore
+- [ ] Implement PureSentinel
+- [ ] Test PureSentinel
+- [ ] Implement AccountSentinel
+- [ ] Test AccountSentinel
+- [ ] Implement KeySentinel
+- [ ] Test KeySentinel
 
-- [x] Restructure generic types
-- [ ] Move Frequency to separate Statistics crate as it is used by Sentinel, but equally by routing for merging messages
-- [ ] Replace return type Option<(Request, MergedMessageFromClaims)> to rx-channel
-
-##External Todo Items
-
-- [ ] On Accumulator crate:
-    - [ ] Only store one value on identical values received
