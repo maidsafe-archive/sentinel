@@ -18,6 +18,7 @@ Confirm group based consensus on messages in a p2p network
 None
 
 ##Todo Items
+## [0.0.2] Implement the three sentinels
 - [ ] [MAID-1061](https://maidsafe.atlassian.net/browse/MAID-1061) Move Frequency back here into this crate
 - [ ] [MAID-1022](https://maidsafe.atlassian.net/browse/MAID-1022) Implement KeyStore
 - [ ] [MAID-1023](https://maidsafe.atlassian.net/browse/MAID-1023) Test KeyStore

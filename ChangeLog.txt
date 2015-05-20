@@ -1,2 +1,5 @@
-Version 0.0.1
+## Sentinel - Change Log
+
+## [0.0.0 - 0.0.1]
 Initial commit
+Reference implementation for the PureSentinel
