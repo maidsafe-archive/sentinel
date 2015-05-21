@@ -137,7 +137,7 @@ impl<'a, Request, Name>
                 self.keys_accumulator.add(request.clone(), keys)
                     .and_then(|(_, set_of_keys)| self.validate(&claims, &set_of_keys))
                     .and_then(|verified_claims| self.resolve(&verified_claims))
-                    .and_then(|merged_claim| return Some((request, merged_claim)))
+                    .map(|merged_claim| (request, merged_claim))
             },
             None => {
                 // if no corresponding claim exists, refuse to accept keys.
@@ -206,7 +206,12 @@ impl<'a, Request, Name>
 
         for keys in sets_of_keys {
             for key in keys {
-                frequency.update(&key.0, &key.1);
+                // We use raw bytes from the key here because in the current
+                // version of sodiumdioxide library PublicKey doesn't derive
+                // from Eq nor PartialEq. Once a version greater or equal to
+                // 0.0.5 is used, we can get rid of this unwrapping and then
+                // rewrapping few lines below.
+                frequency.update(&key.0, &(key.1).0);
             }
         }
 
@@ -218,8 +223,8 @@ impl<'a, Request, Name>
             .map(|(name, public_keys, _)| {
                 (name, public_keys.into_iter()
                                   .filter(|&(_, ref count)| *count >= self.keys_threshold)
-                                  .map(|(public_key, _)| public_key)
-                                  .collect::<Vec<PublicKey>>())})
+                                  .map(|(public_key, _)| PublicKey(public_key))
+                                  .collect::<_>())})
             .collect::<BTreeMap<Name, Vec<PublicKey>>>()
     }
 }

@@ -17,7 +17,3 @@ cbor = "*"
 sodiumoxide = "0.0.4"
 rand = "*"
 accumulator = "0.0.1"
-
-#[dependencies.sodiumoxide]
-#git = "https://github.com/benjaminbollen/sodiumoxide.git"
-## rev = "7597d7d7d5dfb596ff3fbcf354f59a46d5317202"
