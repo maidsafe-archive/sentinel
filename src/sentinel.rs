@@ -35,8 +35,8 @@
 
 use super::{SerialisedClaim};
 
-use flow::frequency::Frequency;
-use flow::frequency_key_value::FrequencyKeyValue;
+use statistics::Frequency;
+use statistics::FrequencyKeyValue;
 use std::collections::BTreeMap;
 
 //use sodiumoxide::crypto;

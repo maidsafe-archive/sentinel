@@ -18,9 +18,6 @@ cbor = "*"
 rand = "*"
 accumulator = "0.0.1"
 
-[dependencies.flow]
-git = "https://github.com/benjaminbollen/flow.git"
-
 [dependencies.sodiumoxide]
 git = "https://github.com/benjaminbollen/sodiumoxide.git"
 # rev = "7597d7d7d5dfb596ff3fbcf354f59a46d5317202"
