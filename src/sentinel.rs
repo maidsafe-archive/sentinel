@@ -209,7 +209,7 @@ impl<'a, Request, Name>
                 // We use raw bytes from the key here because in the current
                 // version of sodiumdioxide library PublicKey doesn't derive
                 // from Eq nor PartialEq. Once a version greater or equal to
-                // 0.0.5 is used, we can get rid of this unwrapping and then
+                // 0.0.6 is used, we can get rid of this unwrapping and then
                 // rewrapping few lines below.
                 frequency.update(&key.0, &(key.1).0);
             }
