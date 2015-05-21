@@ -112,7 +112,7 @@ impl<'a, Request, Name>
                 self.claim_accumulator.add(request.clone(), (claimant, signature, claim))
                     .and_then(|(_, claims)| self.validate(&claims, &set_of_keys))
                     .and_then(|verified_claims| self.resolve(&verified_claims))
-                    .and_then(|merged_claim| return Some((request, merged_claim)))
+                    .map(|merged_claim| (request, merged_claim))
             },
             None => {
                 self.sender.get_signing_keys(request.get_source());
