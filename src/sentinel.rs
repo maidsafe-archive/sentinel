@@ -35,12 +35,12 @@
 
 use super::{SerialisedClaim};
 
-use flow::frequency::Frequency;
-use flow::frequency_key_value::FrequencyKeyValue;
+use statistics::Frequency;
+use statistics::FrequencyKeyValue;
 use std::collections::BTreeMap;
 
-use sodiumoxide::crypto;
-use sodiumoxide::crypto::sign::verify_detached;
+//use sodiumoxide::crypto;
+//use sodiumoxide::crypto::sign::verify_detached;
 use sodiumoxide::crypto::sign::PublicKey;
 use sodiumoxide::crypto::sign::Signature;
 // use std::sync::mpsc::channel;
@@ -229,7 +229,7 @@ mod test {
 
     extern crate rustc_serialize;
     use super::*;
-    use rustc_serialize::{Decodable, Encodable};
+    //use rustc_serialize::{Decodable, Encodable};
 
     #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
     struct TestRequest {

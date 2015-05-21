@@ -37,7 +37,7 @@ extern crate rustc_serialize;
 extern crate accumulator;
 extern crate sodiumoxide;
 extern crate cbor;
-extern crate flow;
+extern crate rand;
 
 use sodiumoxide::crypto;
 use sodiumoxide::crypto::sign::verify_detached;
@@ -49,6 +49,8 @@ pub type SerialisedClaim = Vec<u8>;
 /// Sentinel provides a consensus mechanism on all content messages.
 /// The claims made must be identical and cryptographically signed.
 pub mod sentinel;
+mod statistics;
+
 // pub mod account_sentinel;
 
 fn check_signature(signature: &Signature, public_key: &PublicKey, claim: &SerialisedClaim)
