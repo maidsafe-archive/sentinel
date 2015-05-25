@@ -120,7 +120,7 @@ mod test {
     }
 
     #[test]
-    fn no_self_sing() {
+    fn no_self_sign() {
         let target : NameType = 0;
         let mut ks = KeyStore::<NameType>::new(QUORUM);
         let valid_key = random_key();
