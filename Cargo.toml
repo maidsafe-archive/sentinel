@@ -17,3 +17,7 @@ cbor = "*"
 sodiumoxide = "0.0.5"
 rand = "*"
 accumulator = "0.0.1"
+#lru_time_cache = "0.1.5"
+
+[dependencies.lru_time_cache]
+path = "/home/peter/work/rust/lru_time_cache"

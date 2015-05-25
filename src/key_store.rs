@@ -16,7 +16,10 @@
 // relating to use of the SAFE Network Software.
 
 use sodiumoxide::crypto::sign;
+use lru_time_cache::LruCache;
 use std::collections::{BTreeMap, BTreeSet};
+
+const NAME_CAPACITY: usize = 1000;
 
 // FIXME: We only work with KeyData and not PublicKey directly
 // because PublicKey doesn't derive from Ord in the current version of
@@ -28,15 +31,15 @@ type Set<A>    = BTreeSet<A>;
 
 pub struct KeyStore<Name> where Name: Eq + PartialOrd + Ord + Clone {
     quorum_size: usize,
-    //            +--- To                  +--- From
-    //            V                        V
-    key_map: Map<Name, Map<KeyData, Set<Name>>>,
+    //              +--- To                +--- From
+    //              V                      V
+    cache: LruCache<Name, Map<KeyData, Set<Name>>>,
 }
 
 impl<Name> KeyStore<Name> where Name: Eq + PartialOrd + Ord + Clone {
     pub fn new(quorum_size: usize) -> KeyStore<Name> {
         KeyStore{ quorum_size: quorum_size
-                , key_map: Map::<Name, Map<KeyData, Set<Name>>>::new()
+                , cache: LruCache::with_capacity(NAME_CAPACITY)
         }
     }
 
@@ -44,19 +47,21 @@ impl<Name> KeyStore<Name> where Name: Eq + PartialOrd + Ord + Clone {
         let new_map = || { Map::<KeyData, Set<Name>>::new() };
         let new_set = || { Set::<Name>::new() };
 
-        self.key_map.entry(to).or_insert_with(new_map)
-                    .entry(key.0).or_insert_with(new_set)
-                    .insert(from);
+        self.cache.entry(to).or_insert_with(new_map)
+                  .entry(key.0).or_insert_with(new_set)
+                  .insert(from);
     }
 
-    pub fn get_accumulated_key(&self, to: &Name) -> Option<sign::PublicKey> {
-        self.key_map.get(to).and_then(|keys| self.pick_where_quorum_reached(keys))
+    pub fn get_accumulated_key(&mut self, to: &Name) -> Option<sign::PublicKey> {
+        let quorum = self.quorum_size;
+        self.cache.get(to).and_then(|keys| Self::pick_where_quorum_reached(keys, quorum))
             .cloned().map(sign::PublicKey)
     }
 
-    fn pick_where_quorum_reached<'a>(&self, keys: &'a Map<KeyData, Set<Name>>) -> Option<&'a KeyData> {
+    fn pick_where_quorum_reached<'a>(keys: &'a Map<KeyData, Set<Name>>, quorum: usize)
+    -> Option<&'a KeyData> {
         keys.iter().filter_map(|(key, from_set)| {
-            return if from_set.len() >= self.quorum_size { Some(key) } else { None };
+            return if from_set.len() >= quorum { Some(key) } else { None };
         }).nth(0)
     }
 }
