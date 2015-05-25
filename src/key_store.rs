@@ -112,9 +112,9 @@ mod test {
             ks.add_key(target, i as NameType, valid_key);
 
             if i < QUORUM {
-                assert!(ks.get_accumulated_keys(&0).is_empty());
+                assert!(ks.get_accumulated_keys(&target).is_empty());
             } else {
-                assert!(!ks.get_accumulated_keys(&0).is_empty());
+                assert!(!ks.get_accumulated_keys(&target).is_empty());
             }
         }
     }
@@ -130,7 +130,7 @@ mod test {
         // Node zero sends signature for zero, that shouldn't be valid.
         for i in (0..QUORUM) {
             ks.add_key(target, i as NameType, valid_key);
-            assert!(ks.get_accumulated_keys(&0).is_empty());
+            assert!(ks.get_accumulated_keys(&target).is_empty());
         }
     }
 
@@ -147,9 +147,9 @@ mod test {
             ks.add_key(target, i as NameType, valid_key1);
 
             if i < QUORUM {
-                assert!(ks.get_accumulated_keys(&0).len() == 0);
+                assert!(ks.get_accumulated_keys(&target).len() == 0);
             } else {
-                assert!(ks.get_accumulated_keys(&0).len() == 1);
+                assert!(ks.get_accumulated_keys(&target).len() == 1);
             }
         }
 
@@ -157,9 +157,9 @@ mod test {
             ks.add_key(target, i as NameType, valid_key2);
 
             if i < QUORUM {
-                assert!(ks.get_accumulated_keys(&0).len() == 1);
+                assert!(ks.get_accumulated_keys(&target).len() == 1);
             } else {
-                assert!(ks.get_accumulated_keys(&0).len() == 2);
+                assert!(ks.get_accumulated_keys(&target).len() == 2);
             }
         }
     }
