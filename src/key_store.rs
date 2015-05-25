@@ -106,7 +106,7 @@ mod test {
         let mut ks = KeyStore::<NameType>::new(QUORUM);
         let valid_key = random_key();
 
-        add_noise(&mut ks, 0, 1000);
+        add_noise(&mut ks, target, 1000);
 
         for i in (1..QUORUM+1) {
             ks.add_key(target, i as NameType, valid_key);
@@ -125,7 +125,7 @@ mod test {
         let mut ks = KeyStore::<NameType>::new(QUORUM);
         let valid_key = random_key();
 
-        add_noise(&mut ks, 0, 1000);
+        add_noise(&mut ks, target, 1000);
 
         // Node zero sends signature for zero, that shouldn't be valid.
         for i in (0..QUORUM) {
@@ -141,7 +141,7 @@ mod test {
         let valid_key1 = random_key();
         let valid_key2 = random_key();
 
-        add_noise(&mut ks, 0, 1000);
+        add_noise(&mut ks, target, 1000);
 
         for i in (1..QUORUM+1) {
             ks.add_key(target, i as NameType, valid_key1);
