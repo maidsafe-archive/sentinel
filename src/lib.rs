@@ -35,6 +35,7 @@
 
 extern crate rustc_serialize;
 extern crate accumulator;
+extern crate lru_time_cache;
 extern crate sodiumoxide;
 extern crate cbor;
 extern crate rand;
@@ -49,6 +50,7 @@ pub type SerialisedClaim = Vec<u8>;
 /// Sentinel provides a consensus mechanism on all content messages.
 /// The claims made must be identical and cryptographically signed.
 pub mod sentinel;
+mod key_store;
 mod statistics;
 
 // pub mod account_sentinel;
