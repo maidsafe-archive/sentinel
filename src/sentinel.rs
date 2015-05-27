@@ -36,15 +36,11 @@
 use super::{SerialisedClaim};
 
 use statistics::Frequency;
-use statistics::FrequencyKeyValue;
-use std::collections::BTreeMap;
 
-//use sodiumoxide::crypto;
-//use sodiumoxide::crypto::sign::verify_detached;
 use sodiumoxide::crypto::sign::PublicKey;
 use sodiumoxide::crypto::sign::Signature;
-// use std::sync::mpsc::channel;
 use accumulator::Accumulator;
+use key_store::KeyStore;
 
 
 /// The Request type needs to implement this GetSigningKey trait.
@@ -67,9 +63,8 @@ pub struct Sentinel<'a, Request, Name> // later template also on Signature
           Name: Eq + PartialOrd + Ord + Clone {
     sender: &'a mut (GetSigningKeys<Name> + 'a),
     claim_accumulator: Accumulator<Request, (Name, Signature, SerialisedClaim)>,
-    keys_accumulator: Accumulator<Request, Vec<(Name, PublicKey)>>,
+    key_store: KeyStore<Name>,
     claim_threshold: usize,
-    keys_threshold: usize
 }
 
 impl<'a, Request, Name>
@@ -87,9 +82,8 @@ impl<'a, Request, Name>
         Sentinel {
             sender: sender,
             claim_accumulator: Accumulator::new(claim_threshold),
-            keys_accumulator: Accumulator::new(keys_threshold),
+            key_store: KeyStore::<Name>::new(keys_threshold),
             claim_threshold: claim_threshold,
-            keys_threshold: keys_threshold
         }
     }
 
@@ -100,26 +94,25 @@ impl<'a, Request, Name>
     /// the request and the claim are returned.
     /// All resolved claims have to be identical.
     /// Otherwise None is returned.
-    pub fn add_claim(&mut self, request : Request,
-                     claimant : Name, signature : Signature,
-                     claim : SerialisedClaim)
-        // TODO: replace return option with async events pipe to different thread
-        // TODO: code can be cleaned up more even by correcting ownership of Accumulator
+    pub fn add_claim(&mut self,
+                     request   : Request,
+                     claimant  : Name,            // Node which sent the message
+                     signature : Signature,
+                     claim     : SerialisedClaim)
         -> Option<(Request, SerialisedClaim)> {
 
-        match self.keys_accumulator.get(&request) {
-            Some((_, set_of_keys)) => {
-                self.claim_accumulator.add(request.clone(), (claimant, signature, claim))
-                    .and_then(|(_, claims)| self.validate(&claims, &set_of_keys))
-                    .and_then(|verified_claims| self.resolve(&verified_claims))
-                    .map(|merged_claim| (request, merged_claim))
-            },
-            None => {
-                self.sender.get_signing_keys(request.get_source());
-                self.claim_accumulator.add(request, (claimant, signature, claim));
-                return None;
-            }
+        let saw_first_time = !self.claim_accumulator.contains_key(&request);
+
+        let retval = self.claim_accumulator.add(request.clone(), (claimant, signature, claim))
+            .and_then(|(_, claims)| self.validate(&claims))
+            .and_then(|verified_claims| self.resolve(&verified_claims))
+            .map(|merged_claim| (request.clone(), merged_claim));
+
+        if saw_first_time && retval.is_none() {
+            self.sender.get_signing_keys(request.get_source());
         }
+
+        retval
     }
 
     /// This adds a new set of public_signing_keys for the provided request.
@@ -128,14 +121,15 @@ impl<'a, Request, Name>
     /// the request and the verified and merged claim is returned.
     /// Otherwise None is returned.
     pub fn add_keys(&mut self, request : Request, keys : Vec<(Name, PublicKey)>)
-        // return the Request key and only the merged claim
-        // TODO: replace return option with async events pipe to different thread
         -> Option<(Request, SerialisedClaim)> {
+
+        for (target, public_key) in keys {
+            self.key_store.add_key(target, request.get_source(), public_key);
+        }
 
         match self.claim_accumulator.get(&request) {
             Some((_, claims)) => {
-                self.keys_accumulator.add(request.clone(), keys)
-                    .and_then(|(_, set_of_keys)| self.validate(&claims, &set_of_keys))
+                self.validate(&claims)
                     .and_then(|verified_claims| self.resolve(&verified_claims))
                     .map(|merged_claim| (request, merged_claim))
             },
@@ -148,25 +142,17 @@ impl<'a, Request, Name>
 
     /// Validate is only concerned with checking the signatures of the serialised claims.
     /// To achieve this it pairs up a set of signed claims and a set of public signing keys.
-    fn validate(&self, claims : &Vec<(Name, Signature, SerialisedClaim)>,
-                       sets_of_keys : &Vec<Vec<(Name, PublicKey)>> ) -> Option<Vec<SerialisedClaim>> {
-
-        let keys = self.flatten_keys(sets_of_keys);
-
+    fn validate(&mut self, claims : &Vec<(Name, Signature, SerialisedClaim)>)
+        -> Option<Vec<SerialisedClaim>> {
         let verified_claims = claims.iter()
-            .filter_map(|claim| {
-                keys.get(&claim.0)
-                    .and_then(|public_keys| {
-                        for public_key in public_keys{
-                            match super::check_signature(&claim.1,
-                                                         &public_key,
-                                                         &claim.2) {
-                                Some(claim) => return Some(claim),
-                                None => continue
-                            }
-                        };
-                        None
-                     })
+            .filter_map(|&(ref name, ref signature, ref body)| {
+                for public_key in self.key_store.get_accumulated_keys(&name) {
+                    match super::check_signature(&signature, &public_key, &body) {
+                        Some(body) => return Some(body),
+                        None => continue
+                    }
+                }
+                None
             })
             .collect::<Vec<SerialisedClaim>>();
 
@@ -195,37 +181,6 @@ impl<'a, Request, Name>
             None => None
         };
         resolved_claim
-    }
-
-    fn flatten_keys(&self, sets_of_keys : &Vec<Vec<(Name, PublicKey)>>)
-        -> BTreeMap<Name, Vec<PublicKey>> {
-        // Key, Value Frequency counts a two-level depth tree of key-values
-        // where the occurance of key is the maximum over all value occurances
-        // for that key.
-        let mut frequency = FrequencyKeyValue::new();
-
-        for keys in sets_of_keys {
-            for key in keys {
-                // We use raw bytes from the key here because in the current
-                // version of sodiumdioxide library PublicKey doesn't derive
-                // from Eq nor PartialEq. Once a version greater or equal to
-                // 0.0.6 is used, we can get rid of this unwrapping and then
-                // rewrapping few lines below.
-                frequency.update(&key.0, &(key.1).0);
-            }
-        }
-
-        // retrieve all name and key combinations with a count,
-        // and cut off at threshold.
-        // Frequency resolves duplication conflicts internally
-        frequency.sort_by_highest().into_iter()
-            .filter(|&(_, _, ref count)| *count >= self.keys_threshold)
-            .map(|(name, public_keys, _)| {
-                (name, public_keys.into_iter()
-                                  .filter(|&(_, ref count)| *count >= self.keys_threshold)
-                                  .map(|(public_key, _)| PublicKey(public_key))
-                                  .collect::<_>())})
-            .collect::<BTreeMap<Name, Vec<PublicKey>>>()
     }
 }
 

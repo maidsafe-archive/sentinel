@@ -74,7 +74,7 @@ impl<Name> KeyStore<Name> where Name: Eq + PartialOrd + Ord + Clone {
     fn pick_where_quorum_reached<'a>(keys: &'a Map<KeyData, Set<Name>>, quorum: usize)
     -> Vec<&'a KeyData> {
         keys.iter().filter_map(|(key, sender_set)| {
-            return if sender_set.len() >= quorum { Some(key) } else { None };
+            if sender_set.len() >= quorum { Some(key) } else { None }
         }).collect::<_>()
     }
 }
