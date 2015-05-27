@@ -104,7 +104,7 @@ impl<'a, Request, Name>
         let saw_first_time = !self.claim_accumulator.contains_key(&request);
 
         let retval = self.claim_accumulator.add(request.clone(), (claimant, signature, claim))
-            .and_then(|(request, claims)| self.resolve(&claims).map(|claim| (request, claim)));
+            .and_then(|(request, claims)| self.resolve(request, claims));
 
         if saw_first_time && retval.is_none() {
             self.sender.get_signing_keys(request.get_source());
@@ -126,7 +126,7 @@ impl<'a, Request, Name>
         }
 
         self.claim_accumulator.get(&request)
-            .and_then(|(_, claims)| self.resolve(&claims).map(|c| (request, c)))
+            .and_then(|(request, claims)| self.resolve(request, claims))
     }
 
     /// Verify is only concerned with checking the signatures of the serialised claims.
@@ -170,10 +170,14 @@ impl<'a, Request, Name>
             .map(|(resolved_claim, _)| resolved_claim.clone())
     }
 
-    fn resolve(&mut self, claims: &Vec<(Name, Signature, SerialisedClaim)>)
-        -> Option<SerialisedClaim> {
+    fn resolve(&mut self, request: Request, claims: Vec<(Name, Signature, SerialisedClaim)>)
+        -> Option<(Request, SerialisedClaim)> {
         self.verify(&claims)
             .and_then(|verified_claims| self.squash(verified_claims))
+            .map(|c| {
+                self.claim_accumulator.delete(&request);
+                (request, c)
+            })
     }
 }
 
