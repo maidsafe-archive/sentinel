@@ -105,7 +105,7 @@ impl<'a, Request, Name>
 
         let retval = self.claim_accumulator.add(request.clone(), (claimant, signature, claim))
             .and_then(|(_, claims)| self.verify(&claims))
-            .and_then(|verified_claims| self.resolve(&verified_claims))
+            .and_then(|verified_claims| self.squash(&verified_claims))
             .map(|merged_claim| (request.clone(), merged_claim));
 
         if saw_first_time && retval.is_none() {
@@ -130,7 +130,7 @@ impl<'a, Request, Name>
         match self.claim_accumulator.get(&request) {
             Some((_, claims)) => {
                 self.verify(&claims)
-                    .and_then(|verified_claims| self.resolve(&verified_claims))
+                    .and_then(|verified_claims| self.squash(&verified_claims))
                     .map(|merged_claim| (request, merged_claim))
             },
             None => {
@@ -163,7 +163,7 @@ impl<'a, Request, Name>
         None
     }
 
-    fn resolve(&self, verified_claims : &Vec<SerialisedClaim>) -> Option<SerialisedClaim> {
+    fn squash(&self, verified_claims : &Vec<SerialisedClaim>) -> Option<SerialisedClaim> {
         let mut frequency = Frequency::new();
         for verified_claim in verified_claims {
             frequency.update(&verified_claim)
