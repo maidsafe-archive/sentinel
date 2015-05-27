@@ -35,8 +35,6 @@
 
 use super::{SerialisedClaim};
 
-use statistics::Frequency;
-
 use sodiumoxide::crypto::sign::PublicKey;
 use sodiumoxide::crypto::sign::Signature;
 use accumulator::Accumulator;
@@ -151,21 +149,20 @@ impl<Request, Name>
     }
 
     fn squash(&self, verified_claims : Vec<SerialisedClaim>) -> Option<SerialisedClaim> {
-        if verified_claims.len() < self.claim_threshold {
-            // Can't squash: not enough claims
+        let mut mut_claims = verified_claims;
+
+        if mut_claims.is_empty() || mut_claims.len() < self.claim_threshold {
+            // Can't squash: not enough claims.
             return None;
         }
 
-        let mut frequency = Frequency::new();
+        mut_claims.dedup();
 
-        for verified_claim in verified_claims {
-            frequency.update(&verified_claim)
-        }
+        // We expect all the verified claims to be the same, otherwise they shoudn't
+        // have passed the verification.
+        assert!(mut_claims.len() == 1);
 
-        frequency.sort_by_highest().into_iter()
-            .filter(|&(_, ref count)| *count >= self.claim_threshold)
-            .nth(0)
-            .map(|(resolved_claim, _)| resolved_claim.clone())
+        mut_claims.first().cloned()
     }
 
     fn resolve(&mut self, request: Request, claims: Vec<(Name, Signature, SerialisedClaim)>)

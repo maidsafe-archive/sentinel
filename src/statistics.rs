@@ -15,17 +15,20 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+#[allow(dead_code)]
 pub struct Frequency<Key: PartialEq + Eq + Clone> {
     map: Vec<(Key, usize)>
 }
 
 impl<Key: PartialEq + Eq + Clone> Frequency<Key> {
+    #[allow(dead_code)]
     pub fn new() -> Frequency<Key> {
         Frequency {
             map: Vec::<(Key, usize)>::new()
         }
     }
 
+    #[allow(dead_code)]
     pub fn update(&mut self, key: &Key) {
         let mut fresh_key : bool = true;
         for stored_key in self.map.iter_mut() {
@@ -40,6 +43,7 @@ impl<Key: PartialEq + Eq + Clone> Frequency<Key> {
         }
     }
 
+    #[allow(dead_code)]
     pub fn sort_by_highest(&mut self) -> Vec<(Key, usize)> {
         self.map.sort_by(|a,b| b.1.cmp(&a.1));
         self.map.clone()
