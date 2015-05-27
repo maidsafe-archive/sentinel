@@ -165,22 +165,15 @@ impl<'a, Request, Name>
 
     fn squash(&self, verified_claims : &Vec<SerialisedClaim>) -> Option<SerialisedClaim> {
         let mut frequency = Frequency::new();
+
         for verified_claim in verified_claims {
             frequency.update(&verified_claim)
         }
 
-        let resolved_claims = frequency.sort_by_highest().into_iter()
+        frequency.sort_by_highest().into_iter()
             .filter(|&(_, ref count)| *count >= self.claim_threshold)
-            .map(|(resolved_claim, _)| resolved_claim)
-            .collect::<Vec<&SerialisedClaim>>();
-        assert_eq!(resolved_claims.len(), 1);
-
-        let resolved_claim : Option<SerialisedClaim>
-            = match resolved_claims.first() {
-            Some(&serialised_claim) => Some(serialised_claim.clone()),
-            None => None
-        };
-        resolved_claim
+            .nth(0)
+            .map(|(resolved_claim, _)| resolved_claim.clone())
     }
 }
 
