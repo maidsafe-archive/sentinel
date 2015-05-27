@@ -42,33 +42,29 @@ use sodiumoxide::crypto::sign::Signature;
 use accumulator::Accumulator;
 use key_store::KeyStore;
 
-/// The Request type needs to implement this GetSigningKey trait.
-/// Sentinel will call get_signing_keys() the first time it receives a request
-/// for which it does not yet have any associated keys.
-pub trait GetSigningKeys<Name> where Name: Eq + PartialOrd + Ord  + Clone {
-    fn get_signing_keys(&self, source: Name);
-}
-
 pub trait Source<Name> where Name: Eq + PartialOrd + Ord  + Clone {
     fn get_source(&self) -> Name;
+}
+
+pub enum AddResult<Request, Name> where Request: Eq + PartialOrd + Ord + Clone + Source<Name>,
+                                        Name: Eq + PartialOrd + Ord + Clone {
+    RequestKeys(Name),
+    Resolved(Request, SerialisedClaim),
 }
 
 /// Sentinel is templated on an immutable Request type, a mergeable Claim type.
 /// It further takes a Name type to identify claimants.
 /// Signature and PublicSignKey type are auxiliary types to handle a user-chosen
 /// cryptographic signing scheme.
-pub struct Sentinel<'a, Request, Name>
-
-    where Request: Eq + PartialOrd + Ord + Clone + Source<Name>,
-          Name: Eq + PartialOrd + Ord + Clone {
-    sender: &'a mut (GetSigningKeys<Name> + 'a),
+pub struct Sentinel<Request, Name> where Request: Eq + PartialOrd + Ord + Clone + Source<Name>,
+                                         Name: Eq + PartialOrd + Ord + Clone {
     claim_accumulator: Accumulator<Request, (Name, Signature, SerialisedClaim)>,
     key_store: KeyStore<Name>,
     claim_threshold: usize,
 }
 
-impl<'a, Request, Name>
-    Sentinel<'a, Request, Name>
+impl<Request, Name>
+    Sentinel<Request, Name>
     where Request: Eq + PartialOrd + Ord + Clone + Source<Name>,
           Name: Eq + PartialOrd + Ord + Clone {
     /// This creates a new sentinel that will collect a minimal claim_threshold number
@@ -77,40 +73,41 @@ impl<'a, Request, Name>
     /// signing key. Each such a public signing key needs keys_threshold confirmations
     /// for it to be considered valid and used for verifying the signature
     /// of the corresponding claim.
-    pub fn new(sender: &'a mut GetSigningKeys<Name>, claim_threshold: usize, keys_threshold: usize)
-        -> Sentinel<'a, Request, Name> {
+    pub fn new(claim_threshold: usize, keys_threshold: usize)
+        -> Sentinel<Request, Name> {
         Sentinel {
-            sender: sender,
             claim_accumulator: Accumulator::new(claim_threshold),
             key_store: KeyStore::<Name>::new(keys_threshold),
             claim_threshold: claim_threshold,
         }
     }
 
-    /// This adds a new claim for the provided request.
-    /// The name and the signature provided will be used to verify the claim
-    /// with the keys that are independently retrieved.
-    /// When an added claim leads to the resolution of the request,
-    /// the request and the claim are returned.
-    /// All resolved claims have to be identical.
-    /// Otherwise None is returned.
+    /// This adds a new claim for the provided request. The claimant name and
+    /// the signature provided will be used to verify the claim with the keys
+    /// that are independently retrieved. When an added claim leads to the
+    /// resolution of the request, the request and the claim are returned.
+    /// All resolved claims have to be identical. Otherwise None is returned.
     pub fn add_claim(&mut self,
                      request   : Request,
                      claimant  : Name,            // Node which sent the message
                      signature : Signature,
-                     claim     : SerialisedClaim)
-        -> Option<(Request, SerialisedClaim)> {
+                     claim     : SerialisedClaim) -> Option<AddResult<Request, Name>> {
 
         let saw_first_time = !self.claim_accumulator.contains_key(&request);
 
-        let retval = self.claim_accumulator.add(request.clone(), (claimant, signature, claim))
+        let retval = self.claim_accumulator
+            .add(request.clone(), (claimant, signature, claim))
             .and_then(|(request, claims)| self.resolve(request, claims));
 
-        if saw_first_time && retval.is_none() {
-            self.sender.get_signing_keys(request.get_source());
-        }
-
-        retval
+        retval.map(|(request, serialised_claim)| {
+            AddResult::Resolved(request, serialised_claim)
+        }).or_else(|| {
+            if saw_first_time {
+                Some(AddResult::RequestKeys(request.get_source()))
+            } else {
+                None
+            }
+        })
     }
 
     /// This adds a new set of public_signing_keys for the provided request.
@@ -183,19 +180,10 @@ impl<'a, Request, Name>
 mod test {
 
     extern crate rustc_serialize;
-    use super::*;
-    //use rustc_serialize::{Decodable, Encodable};
 
     #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
     struct TestRequest {
         core : usize
-    }
-
-    impl GetSigningKeys<usize> for TestRequest {
-        #[allow(unused_variables)]
-        fn get_signing_keys(&self, source: usize) {
-            // TODO: can we improve on this now? compared to previous implementation
-        }
     }
 
     #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
