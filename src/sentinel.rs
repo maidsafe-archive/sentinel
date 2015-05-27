@@ -117,14 +117,17 @@ impl<Request, Name>
     /// Otherwise None is returned.
     pub fn add_keys(&mut self, request : Request, keys : Vec<(Name, PublicKey)>)
         -> Option<(Request, SerialisedClaim)> {
-        self.claim_accumulator.get(&request)
-            .and_then(|(request, claims)| {
-                for (target, public_key) in keys {
-                    self.key_store.add_key(target, request.get_source(), public_key);
-                }
+        // We don't want to store keys for requests we haven't received yet because
+        // we couldn't have requested those keys yet. So someone is probably trying
+        // something silly.
+        if self.claim_accumulator.contains_key(&request) {
+            for (target, public_key) in keys {
+                self.key_store.add_key(target, request.get_source(), public_key);
+            }
+        }
 
-                self.resolve(request, claims)
-            })
+        self.claim_accumulator.get(&request)
+            .and_then(|(request, claims)| { self.resolve(request, claims) })
     }
 
     /// Verify is only concerned with checking the signatures of the serialised claims.
@@ -148,7 +151,7 @@ impl<Request, Name>
     }
 
     fn squash(&self, verified_claims : Vec<SerialisedClaim>) -> Option<SerialisedClaim> {
-        if verified_claims.len() <= self.claim_threshold {
+        if verified_claims.len() < self.claim_threshold {
             // Can't squash: not enough claims
             return None;
         }
