@@ -42,7 +42,6 @@ use sodiumoxide::crypto::sign::Signature;
 use accumulator::Accumulator;
 use key_store::KeyStore;
 
-
 /// The Request type needs to implement this GetSigningKey trait.
 /// Sentinel will call get_signing_keys() the first time it receives a request
 /// for which it does not yet have any associated keys.
@@ -59,6 +58,7 @@ pub trait Source<Name> where Name: Eq + PartialOrd + Ord  + Clone {
 /// Signature and PublicSignKey type are auxiliary types to handle a user-chosen
 /// cryptographic signing scheme.
 pub struct Sentinel<'a, Request, Name>
+
     where Request: Eq + PartialOrd + Ord + Clone + Source<Name>,
           Name: Eq + PartialOrd + Ord + Clone {
     sender: &'a mut (GetSigningKeys<Name> + 'a),
@@ -125,15 +125,8 @@ impl<'a, Request, Name>
             self.key_store.add_key(target, request.get_source(), public_key);
         }
 
-        match self.claim_accumulator.get(&request) {
-            Some((_, claims)) => {
-                self.resolve(&claims).map(|merged_claim| (request, merged_claim))
-            },
-            None => {
-                // if no corresponding claim exists, refuse to accept keys.
-                return None;
-            }
-        }
+        self.claim_accumulator.get(&request)
+            .and_then(|(_, claims)| self.resolve(&claims).map(|c| (request, c)))
     }
 
     /// Verify is only concerned with checking the signatures of the serialised claims.
@@ -142,13 +135,7 @@ impl<'a, Request, Name>
         -> Option<Vec<SerialisedClaim>> {
         let verified_claims = claims.iter()
             .filter_map(|&(ref name, ref signature, ref body)| {
-                for public_key in self.key_store.get_accumulated_keys(&name) {
-                    match super::verify_signature(&signature, &public_key, &body) {
-                        Some(body) => return Some(body),
-                        None => continue
-                    }
-                }
-                None
+                self.verify_single_claim(name, signature, body)
             })
             .collect::<Vec<SerialisedClaim>>();
 
@@ -156,6 +143,17 @@ impl<'a, Request, Name>
             return Some(verified_claims)
         }
 
+        None
+    }
+
+    fn verify_single_claim(&mut self, name: &Name, signature: &Signature, body: &SerialisedClaim)
+        -> Option<SerialisedClaim> {
+        for public_key in self.key_store.get_accumulated_keys(&name) {
+            match super::verify_signature(&signature, &public_key, &body) {
+                Some(body) => return Some(body),
+                None => continue
+            }
+        }
         None
     }
 
@@ -177,7 +175,6 @@ impl<'a, Request, Name>
         self.verify(&claims)
             .and_then(|verified_claims| self.squash(verified_claims))
     }
-
 }
 
 #[cfg(test)]
