@@ -120,13 +120,14 @@ impl<'a, Request, Name>
     /// Otherwise None is returned.
     pub fn add_keys(&mut self, request : Request, keys : Vec<(Name, PublicKey)>)
         -> Option<(Request, SerialisedClaim)> {
-
-        for (target, public_key) in keys {
-            self.key_store.add_key(target, request.get_source(), public_key);
-        }
-
         self.claim_accumulator.get(&request)
-            .and_then(|(request, claims)| self.resolve(request, claims))
+            .and_then(|(request, claims)| {
+                for (target, public_key) in keys {
+                    self.key_store.add_key(target, request.get_source(), public_key);
+                }
+
+                self.resolve(request, claims)
+            })
     }
 
     /// Verify is only concerned with checking the signatures of the serialised claims.
