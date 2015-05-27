@@ -88,7 +88,7 @@ impl<'a, Request, Name>
     }
 
     /// This adds a new claim for the provided request.
-    /// The name and the signature provided will be used to validate the claim
+    /// The name and the signature provided will be used to verify the claim
     /// with the keys that are independently retrieved.
     /// When an added claim leads to the resolution of the request,
     /// the request and the claim are returned.
@@ -104,7 +104,7 @@ impl<'a, Request, Name>
         let saw_first_time = !self.claim_accumulator.contains_key(&request);
 
         let retval = self.claim_accumulator.add(request.clone(), (claimant, signature, claim))
-            .and_then(|(_, claims)| self.validate(&claims))
+            .and_then(|(_, claims)| self.verify(&claims))
             .and_then(|verified_claims| self.resolve(&verified_claims))
             .map(|merged_claim| (request.clone(), merged_claim));
 
@@ -129,7 +129,7 @@ impl<'a, Request, Name>
 
         match self.claim_accumulator.get(&request) {
             Some((_, claims)) => {
-                self.validate(&claims)
+                self.verify(&claims)
                     .and_then(|verified_claims| self.resolve(&verified_claims))
                     .map(|merged_claim| (request, merged_claim))
             },
@@ -140,14 +140,14 @@ impl<'a, Request, Name>
         }
     }
 
-    /// Validate is only concerned with checking the signatures of the serialised claims.
+    /// Verify is only concerned with checking the signatures of the serialised claims.
     /// To achieve this it pairs up a set of signed claims and a set of public signing keys.
-    fn validate(&mut self, claims : &Vec<(Name, Signature, SerialisedClaim)>)
+    fn verify(&mut self, claims : &Vec<(Name, Signature, SerialisedClaim)>)
         -> Option<Vec<SerialisedClaim>> {
         let verified_claims = claims.iter()
             .filter_map(|&(ref name, ref signature, ref body)| {
                 for public_key in self.key_store.get_accumulated_keys(&name) {
-                    match super::check_signature(&signature, &public_key, &body) {
+                    match super::verify_signature(&signature, &public_key, &body) {
                         Some(body) => return Some(body),
                         None => continue
                     }
