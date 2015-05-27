@@ -133,18 +133,10 @@ impl<'a, Request, Name>
     /// Verify is only concerned with checking the signatures of the serialised claims.
     /// To achieve this it pairs up a set of signed claims and a set of public signing keys.
     fn verify(&mut self, claims : &Vec<(Name, Signature, SerialisedClaim)>)
-        -> Option<Vec<SerialisedClaim>> {
-        let verified_claims = claims.iter()
-            .filter_map(|&(ref name, ref signature, ref body)| {
+        -> Vec<SerialisedClaim> {
+        claims.iter().filter_map(|&(ref name, ref signature, ref body)| {
                 self.verify_single_claim(name, signature, body)
-            })
-            .collect::<Vec<SerialisedClaim>>();
-
-        if verified_claims.len() >= self.claim_threshold {
-            return Some(verified_claims)
-        }
-
-        None
+            }).collect()
     }
 
     fn verify_single_claim(&mut self, name: &Name, signature: &Signature, body: &SerialisedClaim)
@@ -159,6 +151,11 @@ impl<'a, Request, Name>
     }
 
     fn squash(&self, verified_claims : Vec<SerialisedClaim>) -> Option<SerialisedClaim> {
+        if verified_claims.len() <= self.claim_threshold {
+            // Can't squash: not enough claims
+            return None;
+        }
+
         let mut frequency = Frequency::new();
 
         for verified_claim in verified_claims {
@@ -173,8 +170,8 @@ impl<'a, Request, Name>
 
     fn resolve(&mut self, request: Request, claims: Vec<(Name, Signature, SerialisedClaim)>)
         -> Option<(Request, SerialisedClaim)> {
-        self.verify(&claims)
-            .and_then(|verified_claims| self.squash(verified_claims))
+        let verified_claims = self.verify(&claims);
+        self.squash(verified_claims)
             .map(|c| {
                 self.claim_accumulator.delete(&request);
                 (request, c)
