@@ -193,6 +193,7 @@ mod test {
     }
 
     impl GetSigningKeys<usize> for TestRequest {
+        #[allow(unused_variables)]
         fn get_signing_keys(&self, source: usize) {
             // TODO: can we improve on this now? compared to previous implementation
         }

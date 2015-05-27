@@ -46,10 +46,6 @@ impl<Key: PartialEq + Eq + Clone> Frequency<Key> {
     }
 }
 
-pub struct FrequencyKeyValue<Key: PartialEq + Eq + Clone, Value: PartialEq + Eq + Clone> {
-    map: Vec<(Key, Vec<(Value, usize)>, usize)>
-}
-
 #[cfg(test)]
 mod test {
     use super::*;

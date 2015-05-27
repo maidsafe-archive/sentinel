@@ -19,7 +19,6 @@ use sodiumoxide::crypto::sign;
 use lru_time_cache::LruCache;
 use std::collections::{BTreeMap, BTreeSet};
 
-#[allow(dead_code)]
 const NAME_CAPACITY: usize = 1000;
 
 // FIXME: We only work with KeyData and not PublicKey directly
@@ -30,7 +29,6 @@ type KeyData   = [u8; sign::PUBLICKEYBYTES];
 type Map<A, B> = BTreeMap<A,B>;
 type Set<A>    = BTreeSet<A>;
 
-#[allow(dead_code)]
 pub struct KeyStore<Name> where Name: Eq + PartialOrd + Ord + Clone {
     quorum_size: usize,
     //              +--- Target            +--- Sender
@@ -38,7 +36,6 @@ pub struct KeyStore<Name> where Name: Eq + PartialOrd + Ord + Clone {
     cache: LruCache<Name, Map<KeyData, Set<Name>>>,
 }
 
-#[allow(dead_code)]
 impl<Name> KeyStore<Name> where Name: Eq + PartialOrd + Ord + Clone {
     pub fn new(quorum_size: usize) -> KeyStore<Name> {
         KeyStore{ quorum_size: quorum_size
