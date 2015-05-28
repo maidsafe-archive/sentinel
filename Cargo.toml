@@ -17,7 +17,7 @@ cbor = "*"
 sodiumoxide = "0.0.5"
 rand = "*"
 #accumulator = "0.0.1"
-lru_time_cache = "0.1.6"
+lru_time_cache = "0.1.7"
 
 [dependencies.accumulator]
 git = "https://github.com/inetic/accumulator"
