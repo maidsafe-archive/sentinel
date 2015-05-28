@@ -85,6 +85,13 @@ impl<Request, Name>
     /// that are independently retrieved. When an added claim leads to the
     /// resolution of the request, the request and the claim are returned.
     /// All resolved claims have to be identical. Otherwise None is returned.
+    ///
+    /// Possible results are:
+    /// * Some(AddResult::Resolved(request, serialised_claim)): indicating
+    ///   that the claim has been successfully resolved.
+    /// * Some(AddResult::RequestKeys(target)): indicating that the caller
+    ///   should request public keys from the group surrounding the target.
+    /// * None: indicating that no resolve was possible yet.
     pub fn add_claim(&mut self,
                      request   : Request,
                      claimant  : Name,            // Node which sent the message
