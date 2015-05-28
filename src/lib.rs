@@ -53,14 +53,10 @@ pub mod sentinel;
 mod key_store;
 mod statistics;
 
-// pub mod account_sentinel;
-
-fn check_signature(signature: &Signature, public_key: &PublicKey, claim: &SerialisedClaim)
+fn verify_signature(signature: &Signature, public_key: &PublicKey, claim: &SerialisedClaim)
         -> Option<SerialisedClaim> {
 
-    match crypto::sign::verify_detached(&signature,
-                                        claim,
-                                        public_key) {
+    match crypto::sign::verify_detached(&signature, claim, public_key) {
         true => Some(claim.clone()),
         false => None
     }
