@@ -123,12 +123,14 @@ impl<Request, Name>
     pub fn add_keys(&mut self, request : Request, keys : Vec<(Name, PublicKey)>)
         -> Option<(Request, SerialisedClaim)> {
         // We don't want to store keys for requests we haven't received yet because
-        // we couldn't have requested those keys yet. So someone is probably trying
+        // we couldn't have requested those keys. So someone is probably trying
         // something silly.
-        if self.claim_accumulator.contains_key(&request) {
-            for (target, public_key) in keys {
-                self.key_store.add_key(target, request.get_source(), public_key);
-            }
+        if !self.claim_accumulator.contains_key(&request) {
+            return None;
+        }
+
+        for (target, public_key) in keys {
+            self.key_store.add_key(target, request.get_source(), public_key);
         }
 
         self.claim_accumulator.get(&request)
