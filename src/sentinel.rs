@@ -169,10 +169,17 @@ impl<Request, Name>
             frequency.update(&verified_claim)
         }
 
-        frequency.sort_by_highest().into_iter()
+        let mut iter = frequency.sort_by_highest().into_iter()
             .filter(|&(_, ref count)| *count >= self.claim_threshold)
-            .nth(0)
-            .map(|(resolved_claim, _)| resolved_claim.clone())
+            .map(|(resolved_claim, _)| resolved_claim);
+
+        let retval = iter.next().map(|a| a.clone());
+
+        // In debug mode we expect no adversaries.
+        debug_assert!(retval.is_some(),      "Frequency returned less than one result");
+        debug_assert!(iter.next().is_none(), "Frequency returned more than one result");
+
+        retval
     }
 
     fn resolve(&mut self, request: Request, claims: Vec<(Name, Signature, SerialisedClaim)>)
