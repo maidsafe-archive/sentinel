@@ -93,19 +93,18 @@ impl<Request, Name>
 
         let saw_first_time = !self.claim_accumulator.contains_key(&request);
 
-        let retval = self.claim_accumulator
+        self.claim_accumulator
             .add(request.clone(), (claimant, signature, claim))
-            .and_then(|(request, claims)| self.resolve(request, claims));
-
-        retval.map(|(request, serialised_claim)| {
-            AddResult::Resolved(request, serialised_claim)
-        }).or_else(|| {
-            if saw_first_time {
-                Some(AddResult::RequestKeys(request.get_source()))
-            } else {
-                None
-            }
-        })
+            .and_then(|(request, claims)| self.resolve(request, claims))
+            .map(|(request, serialised_claim)| {
+                AddResult::Resolved(request, serialised_claim)
+            }).or_else(|| {
+                if saw_first_time {
+                    Some(AddResult::RequestKeys(request.get_source()))
+                } else {
+                    None
+                }
+            })
     }
 
     /// This adds a new set of public_signing_keys for the provided request.
