@@ -39,6 +39,7 @@ use sodiumoxide::crypto::sign::PublicKey;
 use sodiumoxide::crypto::sign::Signature;
 use accumulator::Accumulator;
 use key_store::KeyStore;
+use statistics::Frequency;
 
 pub trait Source<Name> where Name: Eq + PartialOrd + Ord  + Clone {
     fn get_source(&self) -> Name;
@@ -155,20 +156,21 @@ impl<Request, Name>
     }
 
     fn squash(&self, verified_claims : Vec<SerialisedClaim>) -> Option<SerialisedClaim> {
-        let mut mut_claims = verified_claims;
-
-        if mut_claims.is_empty() || mut_claims.len() < self.claim_threshold {
+        if verified_claims.len() < self.claim_threshold {
             // Can't squash: not enough claims.
             return None;
         }
 
-        mut_claims.dedup();
+        let mut frequency = Frequency::new();
 
-        // We expect all the verified claims to be the same, otherwise they shoudn't
-        // have passed the verification.
-        assert!(mut_claims.len() == 1);
+        for verified_claim in verified_claims {
+            frequency.update(&verified_claim)
+        }
 
-        mut_claims.first().cloned()
+        frequency.sort_by_highest().into_iter()
+            .filter(|&(_, ref count)| *count >= self.claim_threshold)
+            .nth(0)
+            .map(|(resolved_claim, _)| resolved_claim.clone())
     }
 
     fn resolve(&mut self, request: Request, claims: Vec<(Name, Signature, SerialisedClaim)>)
