@@ -346,22 +346,19 @@ mod test {
                 }));
         }
 
-        // adds one extra key
-        name_key_pairs.push((generate_random_name(), crypto::sign::gen_keypair().0));
-
-        // less than KEY_THRESHOLDS kyes received, should return None
+        // less than KEY_THRESHOLDS kyes received, should return None as the vector has the senders
         for index in 0..KEY_THRESHOLDS {
             assert!(sentinel.add_keys(request.clone(), name_key_pairs[index].0.clone(), name_key_pairs.clone()).is_none());
         }
 
         // KEY_THRESHOLDS kyes received, should not return none
-        assert!(sentinel.add_keys(request.clone(), name_key_pairs[KEY_THRESHOLDS].0.clone(), name_key_pairs.clone())
+        assert!(sentinel.add_keys(request.clone(), generate_random_name(), name_key_pairs.clone())
             .and_then(|result| { assert_eq!(result.1, serialised_claim);
                                  assert_eq!(result.0, request);
                                  Some(result)
             }).is_some());
 
         // more than KEY_THRESHOLDS kyes received, should return None
-        assert!(sentinel.add_keys(request, name_key_pairs[KEY_THRESHOLDS - 1].0.clone(), name_key_pairs).is_none());
+        assert!(sentinel.add_keys(request, generate_random_name(), name_key_pairs).is_none());
     }
 }
