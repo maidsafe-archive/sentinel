@@ -270,7 +270,7 @@ mod test {
             }).is_some());
 
         // One key is required should pass
-        assert!(sentinel.add_keys(request.clone(), name_key_pairs[0].0.clone(), name_key_pairs.clone())
+        assert!(sentinel.add_keys(request.clone(), generate_random_name(), name_key_pairs.clone())
             .and_then(|result| { assert_eq!(result.1, serialised_claim);
                                  assert_eq!(result.0, request);
                                  Some(result)
