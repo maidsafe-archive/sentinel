@@ -121,20 +121,20 @@ impl<Request, Name>
     /// the request and the verified and merged claim is returned.
     /// Otherwise None is returned.
     pub fn add_keys(&mut self, request : Request, sender: Name, keys : Vec<(Name, PublicKey)>)
-          -> Option<(Request, SerialisedClaim)> {
-          // We don't want to store keys for requests we haven't received yet because
-          // we couldn't have requested those keys. So someone is probably trying
-          // something silly.
-          if !self.claim_accumulator.contains_key(&request) {
-              return None;
-          }
+        -> Option<(Request, SerialisedClaim)> {
+        // We don't want to store keys for requests we haven't received yet because
+        // we couldn't have requested those keys. So someone is probably trying
+        // something silly.
+        if !self.claim_accumulator.contains_key(&request) {
+            return None;
+        }
 
-          for (target, public_key) in keys {
-              self.key_store.add_key(target, sender.clone(), public_key);
-          }
+        for (target, public_key) in keys {
+            self.key_store.add_key(target, sender.clone(), public_key);
+        }
 
-          self.claim_accumulator.get(&request)
-              .and_then(|(request, claims)| { self.resolve(request, claims) })
+        self.claim_accumulator.get(&request)
+            .and_then(|(request, claims)| { self.resolve(request, claims) })
     }
 
     /// Verify is only concerned with checking the signatures of the serialised claims.
@@ -346,13 +346,18 @@ mod test {
                 }));
         }
 
+        // adds one extra key
+        let key_pair = crypto::sign::gen_keypair();
+        let climant_name = generate_random_name();
+        name_key_pairs.push((climant_name.clone(), key_pair.0.clone()));
+
         // less than KEY_THRESHOLDS kyes received, should return None
-        for index in 0..KEY_THRESHOLDS - 1 {
+        for index in 0..KEY_THRESHOLDS {
             assert!(sentinel.add_keys(request.clone(), name_key_pairs[index].0.clone(), name_key_pairs.clone()).is_none());
         }
 
         // KEY_THRESHOLDS kyes received, should not return none
-        assert!(sentinel.add_keys(request.clone(), name_key_pairs[KEY_THRESHOLDS - 1].0.clone(), name_key_pairs.clone())
+        assert!(sentinel.add_keys(request.clone(), name_key_pairs[KEY_THRESHOLDS].0.clone(), name_key_pairs.clone())
             .and_then(|result| { assert_eq!(result.1, serialised_claim);
                                  assert_eq!(result.0, request);
                                  Some(result)
