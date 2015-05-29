@@ -120,21 +120,21 @@ impl<Request, Name>
     /// When the added set of keys leads to the resolution of the request,
     /// the request and the verified and merged claim is returned.
     /// Otherwise None is returned.
-    pub fn add_keys(&mut self, request : Request, keys : Vec<(Name, PublicKey)>)
-        -> Option<(Request, SerialisedClaim)> {
-        // We don't want to store keys for requests we haven't received yet because
-        // we couldn't have requested those keys. So someone is probably trying
-        // something silly.
-        if !self.claim_accumulator.contains_key(&request) {
-            return None;
-        }
+    pub fn add_keys(&mut self, request : Request, sender: Name, keys : Vec<(Name, PublicKey)>)
+          -> Option<(Request, SerialisedClaim)> {
+          // We don't want to store keys for requests we haven't received yet because
+          // we couldn't have requested those keys. So someone is probably trying
+          // something silly.
+          if !self.claim_accumulator.contains_key(&request) {
+              return None;
+          }
 
-        for (target, public_key) in keys {
-            self.key_store.add_key(target, request.get_source(), public_key);
-        }
+          for (target, public_key) in keys {
+              self.key_store.add_key(target, sender.clone(), public_key);
+          }
 
-        self.claim_accumulator.get(&request)
-            .and_then(|(request, claims)| { self.resolve(request, claims) })
+          self.claim_accumulator.get(&request)
+              .and_then(|(request, claims)| { self.resolve(request, claims) })
     }
 
     /// Verify is only concerned with checking the signatures of the serialised claims.
@@ -270,7 +270,7 @@ mod test {
             }
 
         // One key is required should pass
-        match sentinel.add_keys(request.clone(), name_key_pairs.clone()) {
+        match sentinel.add_keys(request.clone(), name_key_pairs[0].0.clone(), name_key_pairs.clone()) {
             Some(result) => { assert_eq!(result.1, serialised_claim);
                               assert_eq!(result.0, request)},
             None => assert!(false)
@@ -350,22 +350,22 @@ mod test {
         }
 
         // less than KEY_THRESHOLDS kyes received, should return None
-        for _ in 0..KEY_THRESHOLDS - 1 {
-            match sentinel.add_keys(request.clone(), name_key_pairs.clone()) {
+        for index in 0..KEY_THRESHOLDS - 1 {
+            match sentinel.add_keys(request.clone(), name_key_pairs[index].0.clone(), name_key_pairs.clone()) {
                 Some(_) => assert!(false),
                 None => assert!(true)
             }
         }
 
         // KEY_THRESHOLDS kyes received, should not return none
-        match sentinel.add_keys(request.clone(), name_key_pairs.clone()) {
+        match sentinel.add_keys(request.clone(), name_key_pairs[KEY_THRESHOLDS - 1].0.clone(), name_key_pairs.clone()) {
             Some(result) => { assert_eq!(result.1, serialised_claim);
                               assert_eq!(result.0, request)},
             None => assert!(false)
         }
 
         // more than KEY_THRESHOLDS kyes received, should return None
-        match sentinel.add_keys(request, name_key_pairs) {
+        match sentinel.add_keys(request, name_key_pairs[KEY_THRESHOLDS - 1].0.clone(), name_key_pairs) {
             Some(_) => assert!(false),
             None => assert!(true)
         }
