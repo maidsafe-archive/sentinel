@@ -347,9 +347,7 @@ mod test {
         }
 
         // adds one extra key
-        let key_pair = crypto::sign::gen_keypair();
-        let climant_name = generate_random_name();
-        name_key_pairs.push((climant_name.clone(), key_pair.0.clone()));
+        name_key_pairs.push((generate_random_name(), crypto::sign::gen_keypair().0));
 
         // less than KEY_THRESHOLDS kyes received, should return None
         for index in 0..KEY_THRESHOLDS {
