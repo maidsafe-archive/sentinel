@@ -18,11 +18,13 @@
 use lru_time_cache::LruCache;
 use std::collections::{BTreeSet, BTreeMap};
 
+#[allow(dead_code)]
 const MAX_REQUEST_COUNT: usize = 1000;
 
 type Map<K,V> = BTreeMap<K,V>;
 type Set<V>   = BTreeSet<V>;
 
+#[allow(dead_code)]
 pub struct KeySentinel<Request, Name, IdType>
         where Request: Eq + PartialOrd + Ord + Clone,
               Name:    Eq + PartialOrd + Ord + Clone,
@@ -37,6 +39,7 @@ impl<Request, Name, IdType> KeySentinel<Request, Name, IdType>
           Name:    Eq + PartialOrd + Ord + Clone,
           IdType:  Eq + PartialOrd + Ord + Clone, {
 
+    #[allow(dead_code)]
     pub fn new(claim_threshold: usize, keys_threshold: usize)
             -> KeySentinel<Request, Name, IdType> {
         KeySentinel {
@@ -46,22 +49,30 @@ impl<Request, Name, IdType> KeySentinel<Request, Name, IdType>
         }
     }
 
+    #[allow(dead_code)]
     pub fn add_identities(&mut self,
                           request    : Request,
                           sender     : Name,
                           identities : Vec<IdType>)
         -> Option<(Request, Vec<IdType>)> {
 
-        let mut ids = self.cache.entry(request.clone()).or_insert_with(||Map::new());
+        let retval = {
+            let mut ids = self.cache.entry(request.clone()).or_insert_with(||Map::new());
 
-        for id in identities {
-            ids.entry(id).or_insert_with(||Set::new()).insert(sender.clone());
-        }
+            for id in identities {
+                ids.entry(id).or_insert_with(||Set::new()).insert(sender.clone());
+            }
 
-        Self::try_selecting_group(&ids, self.claim_threshold, self.keys_threshold)
-            .map(|ids| {
-                (request, ids)
-            })
+            Self::try_selecting_group(&ids, self.claim_threshold, self.keys_threshold)
+                .map(|ids| {
+                    (request, ids)
+                })
+        };
+
+        retval.map(|(request, ids)| {
+            self.cache.remove(&request);
+            (request, ids)
+        })
     }
 
     fn try_selecting_group(ids: &Map<IdType, Set<Name>>,
