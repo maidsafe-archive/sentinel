@@ -261,20 +261,20 @@ mod test {
         name_key_pairs.push((climant_name.clone(), key_pair.0.clone()));
 
         // first claim added should return AddResult::RequestKeys
-        match sentinel.add_claim(request.clone(), climant_name.clone(), signature.clone(), serialised_claim.clone()) {
-            Some(result) => match result {
-                AddResult::RequestKeys(source_name) => { assert_eq!(request.get_source(), source_name) },
-                AddResult::Resolved(_, _) => assert!(false)
-                },
-                None => assert!(true)
-            }
+        assert!(sentinel.add_claim(request.clone(), climant_name.clone(), signature.clone(), serialised_claim.clone())
+            .and_then(|result| match result {
+                AddResult::RequestKeys(source_name) => { assert_eq!(request.get_source(), source_name);
+                                                         Some(source_name)
+                                                       }
+                AddResult::Resolved(_, _) => None
+            }).is_some());
 
         // One key is required should pass
-        match sentinel.add_keys(request.clone(), name_key_pairs[0].0.clone(), name_key_pairs.clone()) {
-            Some(result) => { assert_eq!(result.1, serialised_claim);
-                              assert_eq!(result.0, request)},
-            None => assert!(false)
-        }
+        assert!(sentinel.add_keys(request.clone(), name_key_pairs[0].0.clone(), name_key_pairs.clone())
+            .and_then(|result| { assert_eq!(result.1, serialised_claim);
+                                 assert_eq!(result.0, request);
+                                 Some(result)
+                               }).is_some());
     }
 
 #[test]
@@ -289,19 +289,14 @@ mod test {
         let climant_name = generate_random_name();
 
         // first claim added should return AddResult::RequestKeys
-        match sentinel.add_claim(request.clone(), climant_name.clone(), signature.clone(), serialised_claim.clone()) {
-            Some(result) => match result {
-                AddResult::RequestKeys(source_name) => { assert_eq!(request.get_source(), source_name) },
-                AddResult::Resolved(_, _) => assert!(false)
-                },
-                None => assert!(true)
-            }
+        assert!(sentinel.add_claim(request.clone(), climant_name.clone(), signature.clone(), serialised_claim.clone())
+            .and_then(|result| match result {
+                AddResult::RequestKeys(source_name) => { assert_eq!(request.get_source(), source_name); Some(source_name) },
+                AddResult::Resolved(_, _) => None
+            }).is_some());
 
         // same claim added for the second time none to be returned
-        match sentinel.add_claim(request, climant_name, signature, serialised_claim) {
-            Some(_) => assert!(false),
-            None => assert!(true)
-        }
+        assert!(sentinel.add_claim(request, climant_name, signature, serialised_claim).is_none())
     }
 
 #[test]
@@ -312,18 +307,19 @@ mod test {
         let request = TestRequest::new(random::<usize>(), name.clone());
         let claim = TestClaim { value : random::<usize>() };
         let serialised_claim = claim.serialise();
-        for _ in 0..CLAIM_THRESHOLDS {
+        for index in 0..CLAIM_THRESHOLDS {
             let key_pair = crypto::sign::gen_keypair();
             let signature = crypto::sign::sign_detached(&serialised_claim, &key_pair.1);
             let climant_name = generate_random_name();
             name_key_pairs.push((climant_name.clone(), key_pair.0.clone()));
-            match sentinel.add_claim(request.clone(), climant_name, signature.clone(), serialised_claim.clone()) {
-                Some(result) => match result {
-                    AddResult::RequestKeys(source_name) => { assert_eq!(request.get_source(), source_name) },
-                    AddResult::Resolved(_, _) => assert!(false)
-                    },
-                    None => assert!(true)
-                }
+            assert!(sentinel.add_claim(request.clone(), climant_name, signature.clone(), serialised_claim.clone())
+                .map_or(true, |result| match result {
+                    AddResult::RequestKeys(source_name) => { assert_eq!(request.get_source(), source_name);
+                                                             assert_eq!(index, 0usize);
+                                                             true
+                                                            },
+                    AddResult::Resolved(_, _) => false
+                }));
         }
     }
 
@@ -335,39 +331,34 @@ mod test {
         let request = TestRequest::new(random::<usize>(), name.clone());
         let claim = TestClaim { value : random::<usize>() };
         let serialised_claim = claim.serialise();
-        for _ in 0..CLAIM_THRESHOLDS {
+        for index in 0..CLAIM_THRESHOLDS {
             let key_pair = crypto::sign::gen_keypair();
             let signature = crypto::sign::sign_detached(&serialised_claim, &key_pair.1);
             let climant_name = generate_random_name();
             name_key_pairs.push((climant_name.clone(), key_pair.0.clone()));
-            match sentinel.add_claim(request.clone(), climant_name, signature.clone(), serialised_claim.clone()) {
-                Some(result) => match result {
-                    AddResult::RequestKeys(source_name) => { assert_eq!(request.get_source(), source_name) },
-                    AddResult::Resolved(_, _) => assert!(false)
-                    },
-                    None => assert!(true)
-                }
+            assert!(sentinel.add_claim(request.clone(), climant_name, signature.clone(), serialised_claim.clone())
+                .map_or(true, |result| match result {
+                    AddResult::RequestKeys(source_name) => { assert_eq!(request.get_source(), source_name);
+                                                             assert_eq!(index, 0usize);
+                                                             true
+                                                            },
+                    AddResult::Resolved(_, _) => false
+                }));
         }
 
         // less than KEY_THRESHOLDS kyes received, should return None
         for index in 0..KEY_THRESHOLDS - 1 {
-            match sentinel.add_keys(request.clone(), name_key_pairs[index].0.clone(), name_key_pairs.clone()) {
-                Some(_) => assert!(false),
-                None => assert!(true)
-            }
+            assert!(sentinel.add_keys(request.clone(), name_key_pairs[index].0.clone(), name_key_pairs.clone()).is_none());
         }
 
         // KEY_THRESHOLDS kyes received, should not return none
-        match sentinel.add_keys(request.clone(), name_key_pairs[KEY_THRESHOLDS - 1].0.clone(), name_key_pairs.clone()) {
-            Some(result) => { assert_eq!(result.1, serialised_claim);
-                              assert_eq!(result.0, request)},
-            None => assert!(false)
-        }
+        assert!(sentinel.add_keys(request.clone(), name_key_pairs[KEY_THRESHOLDS - 1].0.clone(), name_key_pairs.clone())
+            .and_then(|result| { assert_eq!(result.1, serialised_claim);
+                                 assert_eq!(result.0, request);
+                                 Some(result)
+            }).is_some());
 
         // more than KEY_THRESHOLDS kyes received, should return None
-        match sentinel.add_keys(request, name_key_pairs[KEY_THRESHOLDS - 1].0.clone(), name_key_pairs) {
-            Some(_) => assert!(false),
-            None => assert!(true)
-        }
+        assert!(sentinel.add_keys(request, name_key_pairs[KEY_THRESHOLDS - 1].0.clone(), name_key_pairs).is_none());
     }
 }
