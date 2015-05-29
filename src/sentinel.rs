@@ -218,7 +218,7 @@ mod test {
         TestName { data : arr.to_vec() }
     }
 
-    #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
     struct TestRequest {
         core : usize,
         name : TestName
@@ -242,46 +242,63 @@ mod test {
     }
 
     impl TestClaim {
-        pub fn serialse(&self) -> SerialisedClaim {
+        pub fn serialise(&self) -> SerialisedClaim {
             self.value.to_string().into_bytes()
         }
     }
 
 #[test]
-    fn one_request_added() {
-        let mut sentinel: Sentinel<TestRequest, TestName> = Sentinel::new(CLAIM_THRESHOLDS,
-                                                                          KEY_THRESHOLDS);
+    fn one_request_and_one_key() {
+        let mut name_key_pairs = Vec::new();
+        let mut sentinel: Sentinel<TestRequest, TestName> = Sentinel::new(1usize, 1usize);
         let name = generate_random_name();
         let request = TestRequest::new(random::<usize>(), name.clone());
         let claim = TestClaim { value : random::<usize>() };
-        let serialised_claim = claim.serialse();
+        let serialised_claim = claim.serialise();
         let key_pair = crypto::sign::gen_keypair();
         let signature = crypto::sign::sign_detached(&serialised_claim, &key_pair.1);
         let climant_name = generate_random_name();
-        match sentinel.add_claim(request.clone(), climant_name, signature.clone(), claim.serialse()) {
+        name_key_pairs.push((climant_name.clone(), key_pair.0.clone()));
+
+        // first claim added should return AddResult::RequestKeys
+        match sentinel.add_claim(request.clone(), climant_name.clone(), signature.clone(), serialised_claim.clone()) {
             Some(result) => match result {
                 AddResult::RequestKeys(source_name) => { assert_eq!(request.get_source(), source_name) },
                 AddResult::Resolved(_, _) => assert!(false)
                 },
                 None => assert!(true)
             }
+
+        // One key is required should pass
+        match sentinel.add_keys(request.clone(), name_key_pairs.clone()) {
+            Some(result) => { assert_eq!(result.1, serialised_claim);
+                              assert_eq!(result.0, request)},
+            None => assert!(false)
+        }
     }
 
-
 #[test]
-    fn duplicate_request_added() {
-        let mut sentinel: Sentinel<TestRequest, TestName> = Sentinel::new(CLAIM_THRESHOLDS,
-                                                                          KEY_THRESHOLDS);
+    fn request_and_its_duplicate_added() {
+        let mut sentinel: Sentinel<TestRequest, TestName> = Sentinel::new(CLAIM_THRESHOLDS, KEY_THRESHOLDS);
         let name = generate_random_name();
         let request = TestRequest::new(random::<usize>(), name.clone());
         let claim = TestClaim { value : random::<usize>() };
-        let serialised_claim = claim.serialse();
+        let serialised_claim = claim.serialise();
         let key_pair = crypto::sign::gen_keypair();
         let signature = crypto::sign::sign_detached(&serialised_claim, &key_pair.1);
         let climant_name = generate_random_name();
-        let _ = sentinel.add_claim(request.clone(), climant_name.clone(), signature.clone(), claim.serialse());
-        // same request added for the second time
-        match sentinel.add_claim(request, climant_name, signature, claim.serialse()) {
+
+        // first claim added should return AddResult::RequestKeys
+        match sentinel.add_claim(request.clone(), climant_name.clone(), signature.clone(), serialised_claim.clone()) {
+            Some(result) => match result {
+                AddResult::RequestKeys(source_name) => { assert_eq!(request.get_source(), source_name) },
+                AddResult::Resolved(_, _) => assert!(false)
+                },
+                None => assert!(true)
+            }
+
+        // same claim added for the second time none to be returned
+        match sentinel.add_claim(request, climant_name, signature, serialised_claim) {
             Some(_) => assert!(false),
             None => assert!(true)
         }
@@ -290,18 +307,17 @@ mod test {
 #[test]
     fn threshold_claims_requests_added_with_no_keys() {
         let mut name_key_pairs = Vec::new();
-        let mut sentinel: Sentinel<TestRequest, TestName> = Sentinel::new(CLAIM_THRESHOLDS,
-                                                                          KEY_THRESHOLDS);
+        let mut sentinel: Sentinel<TestRequest, TestName> = Sentinel::new(CLAIM_THRESHOLDS, KEY_THRESHOLDS);
         let name = generate_random_name();
         let request = TestRequest::new(random::<usize>(), name.clone());
         let claim = TestClaim { value : random::<usize>() };
-        let serialised_claim = claim.serialse();
+        let serialised_claim = claim.serialise();
         for _ in 0..CLAIM_THRESHOLDS {
             let key_pair = crypto::sign::gen_keypair();
             let signature = crypto::sign::sign_detached(&serialised_claim, &key_pair.1);
             let climant_name = generate_random_name();
             name_key_pairs.push((climant_name.clone(), key_pair.0.clone()));
-            match sentinel.add_claim(request.clone(), climant_name, signature.clone(), claim.serialse()) {
+            match sentinel.add_claim(request.clone(), climant_name, signature.clone(), serialised_claim.clone()) {
                 Some(result) => match result {
                     AddResult::RequestKeys(source_name) => { assert_eq!(request.get_source(), source_name) },
                     AddResult::Resolved(_, _) => assert!(false)
@@ -312,20 +328,19 @@ mod test {
     }
 
 #[test]
-    fn requests_added_with_less_than_key_threshold_keys() {
+    fn requests_added_with_various_key_size() {
         let mut name_key_pairs = Vec::new();
-        let mut sentinel: Sentinel<TestRequest, TestName> = Sentinel::new(CLAIM_THRESHOLDS,
-                                                                          KEY_THRESHOLDS);
+        let mut sentinel: Sentinel<TestRequest, TestName> = Sentinel::new(CLAIM_THRESHOLDS, KEY_THRESHOLDS);
         let name = generate_random_name();
         let request = TestRequest::new(random::<usize>(), name.clone());
         let claim = TestClaim { value : random::<usize>() };
-        let serialised_claim = claim.serialse();
+        let serialised_claim = claim.serialise();
         for _ in 0..CLAIM_THRESHOLDS {
             let key_pair = crypto::sign::gen_keypair();
             let signature = crypto::sign::sign_detached(&serialised_claim, &key_pair.1);
             let climant_name = generate_random_name();
             name_key_pairs.push((climant_name.clone(), key_pair.0.clone()));
-            match sentinel.add_claim(request.clone(), climant_name, signature.clone(), claim.serialse()) {
+            match sentinel.add_claim(request.clone(), climant_name, signature.clone(), serialised_claim.clone()) {
                 Some(result) => match result {
                     AddResult::RequestKeys(source_name) => { assert_eq!(request.get_source(), source_name) },
                     AddResult::Resolved(_, _) => assert!(false)
@@ -334,37 +349,7 @@ mod test {
                 }
         }
 
-        for _ in 0..KEY_THRESHOLDS - 1 {
-            match sentinel.add_keys(request.clone(), name_key_pairs.clone()) {
-                Some(_) => assert!(false),
-                None => assert!(true)
-            }
-        }
-    }
-
-#[test]
-    fn requests_added_with_enough_key_threshold_keys() {
-        let mut name_key_pairs = Vec::new();
-        let mut sentinel: Sentinel<TestRequest, TestName> = Sentinel::new(CLAIM_THRESHOLDS,
-                                                                          KEY_THRESHOLDS);
-        let name = generate_random_name();
-        let request = TestRequest::new(random::<usize>(), name.clone());
-        let claim = TestClaim { value : random::<usize>() };
-        let serialised_claim = claim.serialse();
-        for _ in 0..CLAIM_THRESHOLDS {
-            let key_pair = crypto::sign::gen_keypair();
-            let signature = crypto::sign::sign_detached(&serialised_claim, &key_pair.1);
-            let climant_name = generate_random_name();
-            name_key_pairs.push((climant_name.clone(), key_pair.0.clone()));
-            match sentinel.add_claim(request.clone(), climant_name, signature.clone(), claim.serialse()) {
-                Some(result) => match result {
-                    AddResult::RequestKeys(source_name) => { assert_eq!(request.get_source(), source_name) },
-                    AddResult::Resolved(_, _) => assert!(false)
-                    },
-                    None => assert!(true)
-                }
-        }
-
+        // less than KEY_THRESHOLDS kyes received, should return None
         for _ in 0..KEY_THRESHOLDS - 1 {
             match sentinel.add_keys(request.clone(), name_key_pairs.clone()) {
                 Some(_) => assert!(false),
@@ -372,51 +357,15 @@ mod test {
             }
         }
 
-        // the last node to send keys
+        // KEY_THRESHOLDS kyes received, should not return none
         match sentinel.add_keys(request.clone(), name_key_pairs.clone()) {
-            Some(_) => assert!(true),
-            None => assert!(false)
-        }
-    }
-
-#[test]
-    fn requests_added_with_more_than_key_threshold_keys() {
-        let mut name_key_pairs = Vec::new();
-        let mut sentinel: Sentinel<TestRequest, TestName> = Sentinel::new(CLAIM_THRESHOLDS,
-                                                                          KEY_THRESHOLDS);
-        let name = generate_random_name();
-        let request = TestRequest::new(random::<usize>(), name.clone());
-        let claim = TestClaim { value : random::<usize>() };
-        let serialised_claim = claim.serialse();
-        for _ in 0..CLAIM_THRESHOLDS {
-            let key_pair = crypto::sign::gen_keypair();
-            let signature = crypto::sign::sign_detached(&serialised_claim, &key_pair.1);
-            let climant_name = generate_random_name();
-            name_key_pairs.push((climant_name.clone(), key_pair.0.clone()));
-            match sentinel.add_claim(request.clone(), climant_name, signature.clone(), claim.serialse()) {
-                Some(result) => match result {
-                    AddResult::RequestKeys(source_name) => { assert_eq!(request.get_source(), source_name) },
-                    AddResult::Resolved(_, _) => assert!(false)
-                    },
-                    None => assert!(true)
-                }
-        }
-
-        for _ in 0..KEY_THRESHOLDS - 1 {
-            match sentinel.add_keys(request.clone(), name_key_pairs.clone()) {
-                Some(_) => assert!(false),
-                None => assert!(true)
-            }
-        }
-
-        // the last node to send keys
-        match sentinel.add_keys(request.clone(), name_key_pairs.clone()) {
-            Some(_) => assert!(true),
+            Some(result) => { assert_eq!(result.1, serialised_claim);
+                              assert_eq!(result.0, request)},
             None => assert!(false)
         }
 
-        // one extra add keys request
-        match sentinel.add_keys(request.clone(), name_key_pairs.clone()) {
+        // more than KEY_THRESHOLDS kyes received, should return None
+        match sentinel.add_keys(request, name_key_pairs) {
             Some(_) => assert!(false),
             None => assert!(true)
         }
