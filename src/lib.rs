@@ -51,6 +51,7 @@ pub type SerialisedClaim = Vec<u8>;
 /// The claims made must be identical and cryptographically signed.
 pub mod sentinel;
 mod key_store;
+mod key_sentinel;
 mod statistics;
 
 fn verify_signature(signature: &Signature, public_key: &PublicKey, claim: &SerialisedClaim)

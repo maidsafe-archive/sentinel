@@ -76,7 +76,7 @@ impl<Request, Name>
         -> Sentinel<Request, Name> {
         Sentinel {
             claim_accumulator: Accumulator::new(claim_threshold),
-            key_store: KeyStore::<Name>::new(keys_threshold),
+            key_store: KeyStore::new(keys_threshold),
             claim_threshold: claim_threshold,
         }
     }
