@@ -29,6 +29,7 @@ type KeyData   = [u8; sign::PUBLICKEYBYTES];
 type Map<A, B> = BTreeMap<A,B>;
 type Set<A>    = BTreeSet<A>;
 
+#[derive(Clone)]
 pub struct KeyStore<Name> where Name: Eq + PartialOrd + Ord + Clone {
     quorum_size: usize,
     //              +--- Target            +--- Sender

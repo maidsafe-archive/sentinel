@@ -16,7 +16,10 @@
 // relating to use of the SAFE Network Software.
 
 use lru_time_cache::LruCache;
+use sodiumoxide::crypto::sign;
 use std::collections::{BTreeSet, BTreeMap};
+use key_store::KeyStore;
+use std::marker::PhantomData;
 
 #[allow(dead_code)]
 const MAX_REQUEST_COUNT: usize = 1000;
@@ -24,49 +27,69 @@ const MAX_REQUEST_COUNT: usize = 1000;
 type Map<K,V> = BTreeMap<K,V>;
 type Set<V>   = BTreeSet<V>;
 
-#[allow(dead_code)]
-pub struct KeySentinel<Request, Name, IdType>
-        where Request: Eq + PartialOrd + Ord + Clone,
-              Name:    Eq + PartialOrd + Ord + Clone,
-              IdType:  Eq + PartialOrd + Ord + Clone, {
-    cache: LruCache<Request, Map<IdType, Set<Name>>>,
-    claim_threshold: usize,
-    keys_threshold: usize,
+pub trait IdTrait<NameType> {
+    fn name(&self) -> NameType;
+    fn public_key(&self) -> sign::PublicKey;
 }
 
-impl<Request, Name, IdType> KeySentinel<Request, Name, IdType>
+pub trait GroupClaimTrait<IdTrait> {
+    fn group_identities(&self) -> Vec<IdTrait>;
+    fn verify_public_key(&self, _: &sign::PublicKey) -> bool;
+}
+
+#[allow(dead_code)]
+pub struct KeySentinel<Request, Name, IdType, GroupClaim>
+        where Request: Eq + PartialOrd + Ord + Clone,
+              Name:    Eq + PartialOrd + Ord + Clone,
+              IdType:  Eq + PartialOrd + Ord + Clone + IdTrait<Name>,
+              GroupClaim:  Eq + PartialOrd + Ord + Clone + GroupClaimTrait<IdType>, {
+    cache: LruCache<Request, (KeyStore<Name>, Map<Name, Set<GroupClaim>>)>,
+    claim_threshold: usize,
+    keys_threshold: usize,
+    phantom: PhantomData<IdType>,
+}
+
+impl<Request, Name, IdType, GroupClaim> KeySentinel<Request, Name, IdType, GroupClaim>
     where Request: Eq + PartialOrd + Ord + Clone,
           Name:    Eq + PartialOrd + Ord + Clone,
-          IdType:  Eq + PartialOrd + Ord + Clone, {
+          IdType:  Eq + PartialOrd + Ord + Clone + IdTrait<Name>,
+          GroupClaim: Eq + PartialOrd + Ord + Clone + GroupClaimTrait<IdType>, {
 
     #[allow(dead_code)]
     pub fn new(claim_threshold: usize, keys_threshold: usize)
-            -> KeySentinel<Request, Name, IdType> {
+            -> KeySentinel<Request, Name, IdType, GroupClaim> {
         KeySentinel {
             cache: LruCache::with_capacity(MAX_REQUEST_COUNT),
             claim_threshold: claim_threshold,
             keys_threshold: keys_threshold,
+            phantom: PhantomData,
         }
     }
 
     #[allow(dead_code)]
     pub fn add_identities(&mut self,
-                          request    : Request,
-                          sender     : Name,
-                          identities : Vec<IdType>)
+                          request : Request,
+                          sender  : Name,
+                          claim   : GroupClaim)
         -> Option<(Request, Vec<IdType>)> {
 
         let retval = {
-            let mut ids = self.cache.entry(request.clone()).or_insert_with(||Map::new());
+            let keys_threshold = self.keys_threshold;
+            let keys_and_claims
+                = self.cache.entry(request.clone())
+                            .or_insert_with(||(KeyStore::new(keys_threshold), Map::new()));
 
-            for id in identities {
-                ids.entry(id).or_insert_with(||Set::new()).insert(sender.clone());
+            let ref mut keys   = &mut keys_and_claims.0;
+            let ref mut claims = &mut keys_and_claims.1;
+
+            for id in claim.group_identities() {
+                keys.add_key(id.name(), sender.clone(), id.public_key());
             }
 
-            Self::try_selecting_group(&ids, self.claim_threshold, self.keys_threshold)
-                .map(|ids| {
-                    (request, ids)
-                })
+            claims.entry(sender).or_insert_with(||Set::new()).insert(claim);
+
+            Self::try_selecting_group(keys, claims, self.claim_threshold)
+                .map(|ids|(request, ids))
         };
 
         retval.map(|(request, ids)| {
@@ -75,20 +98,33 @@ impl<Request, Name, IdType> KeySentinel<Request, Name, IdType>
         })
     }
 
-    fn try_selecting_group(ids: &Map<IdType, Set<Name>>,
-                           claim_threshold: usize,
-                           keys_threshold: usize) -> Option<Vec<IdType>> {
-        let mut confirmed_ids = ids.iter()
-                               .map(|(id, senders)| (id, senders.len()))
-                               .filter(|&(_, ref cnt)| *cnt >= keys_threshold)
-                               .collect::<Vec<_>>();
+    fn try_selecting_group(key_store: &mut KeyStore<Name>,
+                           claims: &Map<Name, Set<GroupClaim>>,
+                           claim_threshold: usize) -> Option<Vec<IdType>> {
 
-        if confirmed_ids.len() < claim_threshold {
+        let verified_claims = claims.iter().filter_map(|(name, claims)| {
+            for claim in claims {
+                if Self::verify_claim(name, key_store, claim) {
+                    return Some(claim);
+                }
+            }
+            None
+        }).collect::<Set<_>>();
+
+        if verified_claims.len() < claim_threshold {
             return None;
         }
 
-        confirmed_ids.sort_by(|a, b| b.1.cmp(&a.1));
-        Some(confirmed_ids.iter().map(|pair|pair.0.clone()).collect())
+        Some(verified_claims.iter().flat_map(|claim| claim.group_identities()).collect())
+    }
+
+    fn verify_claim(author: &Name, key_store: &mut KeyStore<Name>, claim: &GroupClaim) -> bool {
+        for public_key in key_store.get_accumulated_keys(&author) {
+            if claim.verify_public_key(&public_key) {
+                return true
+            }
+        }
+        false
     }
 }
 
