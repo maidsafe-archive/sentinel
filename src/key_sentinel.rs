@@ -137,128 +137,119 @@ impl<Request, Name, IdType, GroupClaim> KeySentinel<Request, Name, IdType, Group
     }
 }
 
-//#[cfg(test)]
-//mod test {
-//    use super::*;
-//    use rand::random;
-//    use sodiumoxide::crypto::sign;
-//    use std::fmt;
-//
-//    const MESSAGE_SIZE: usize = 4;
-//    const CLAIMS_THRESHOLD: usize = 10;
-//    const KEYS_THRESHOLD: usize = 10;
-//
-//    #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
-//    pub struct TestName(pub u32);
-//
-//    fn generate_random_message() -> Vec<u8> {
-//        let mut arr = [0u8;MESSAGE_SIZE];
-//        for i in (0..MESSAGE_SIZE) { arr[i] = random::<u8>(); }
-//        arr.to_vec()
-//    }
-//
-//    #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
-//    struct TestRequest {
-//        core : usize,
-//        name : TestName
-//    }
-//
-//    impl TestRequest {
-//        pub fn new(core: usize, name: TestName) -> TestRequest {
-//            TestRequest { core : core, name : name }
-//        }
-//    }
-//
-//    #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
-//    struct TestIdType {
-//        name: TestName,
-//        public_key: [u8;sign::PUBLICKEYBYTES],
-//    }
-//
-//    impl IdTrait<TestName> for TestIdType {
-//        fn name(&self) -> TestName  {
-//            self.name.clone()
-//        }
-//
-//        fn public_key(&self) -> sign::PublicKey {
-//            sign::PublicKey(self.public_key)
-//        }
-//    }
-//
-//    #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
-//    struct TestGroupClaim {
-//        serialised_message: Vec<u8>,
-//        identities: Vec<TestIdType>,
-//        signature: Vec<u8>,
-//    }
-//
-//    impl fmt::Debug for TestGroupClaim {
-//        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//            write!(f, "Message({:?})", self.serialised_message)
-//        }
-//    }
-//
-//    impl TestGroupClaim {
-//        pub fn new(serialised_message: Vec<u8>,
-//                   signature: sign::Signature,
-//                   identities: Vec<TestIdType>) -> TestGroupClaim {
-//
-//            let mut sig = Vec::<u8>::new();
-//
-//            for c in signature.0.iter() { sig.push(c.clone()); }
-//
-//            TestGroupClaim { serialised_message: serialised_message,
-//                             signature: sig,
-//                             identities: identities }
-//        }
-//    }
-//
-//    impl GroupClaimTrait<TestIdType> for TestGroupClaim {
-//        fn group_identities(&self) -> Vec<TestIdType> {
-//            self.identities.clone()
-//        }
-//
-//        fn verify_public_key(&self, public_key: &sign::PublicKey) -> bool {
-//            let mut sig = [0u8;sign::SIGNATUREBYTES];
-//            let mut i = 0;
-//            for byte in &self.signature {
-//                sig[i] = byte.clone();
-//                i += 1;
-//            }
-//            sign::verify_detached(&sign::Signature(sig), &self.serialised_message, public_key)
-//        }
-//    }
-//
-//#[test]
-//    fn key_sentinel() {
-//        let mut sentinel: KeySentinel<TestRequest, TestName, TestIdType, TestGroupClaim>
-//            = KeySentinel::new(CLAIMS_THRESHOLD, KEYS_THRESHOLD);
-//        let random_message = generate_random_message();
-//        let mut tuples = Vec::new();
-//        for i in 0..KEYS_THRESHOLD + 1 {
-//            let key_pair = sign::gen_keypair();
-//            let signature = sign::sign_detached(&random_message, &key_pair.1);
-//            tuples.push((TestName(i as u32), key_pair.0, signature));
-//        }
-//
-//        let request = TestRequest::new(random::<usize>(), TestName((KEYS_THRESHOLD + 1) as u32));
-//        let name_pubs = tuples.iter().map(|&(ref name, ref public_key, _)|
-//                                            TestIdType { name: name.clone(),
-//                                                         public_key: public_key.clone().0 })
-//                                     .collect::<Vec<_>>();
-//        for index in 0..KEYS_THRESHOLD + 1 {
-//            let group_claim = TestGroupClaim::new(random_message.clone(),
-//                                                  tuples[index].2.clone(),
-//                                                  name_pubs.clone());
-//            if index < KEYS_THRESHOLD {
-//                assert!(sentinel.add_identities(request.clone(),
-//                                                tuples[index].0.clone(),
-//                                                group_claim).is_none());
-//                continue;
-//            }
-//            assert!(sentinel.add_identities(request.clone(),
-//                                            tuples[KEYS_THRESHOLD].0.clone(),
-//                                            group_claim).is_some());
-//        }
-//    }
-//}
+#[cfg(test)]
+mod test {
+    use super::*;
+    use rand::random;
+    use sodiumoxide::crypto::sign;
+    use std::fmt;
+    use wrappers::SignW;
+
+    const MESSAGE_SIZE: usize = 4;
+    const CLAIMS_THRESHOLD: usize = 10;
+    const KEYS_THRESHOLD: usize = 10;
+
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
+    pub struct TestName(pub u32);
+
+    fn generate_random_message() -> Vec<u8> {
+        let mut arr = [0u8;MESSAGE_SIZE];
+        for i in (0..MESSAGE_SIZE) { arr[i] = random::<u8>(); }
+        arr.to_vec()
+    }
+
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
+    struct TestRequest {
+        core : usize,
+        name : TestName
+    }
+
+    impl TestRequest {
+        pub fn new(core: usize, name: TestName) -> TestRequest {
+            TestRequest { core : core, name : name }
+        }
+    }
+
+    #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+    struct TestIdType {
+        name: TestName,
+        public_key: [u8;sign::PUBLICKEYBYTES],
+    }
+
+    impl IdTrait<TestName> for TestIdType {
+        fn name(&self) -> TestName  {
+            self.name.clone()
+        }
+
+        fn public_key(&self) -> sign::PublicKey {
+            sign::PublicKey(self.public_key)
+        }
+    }
+
+    #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+    struct TestGroupClaim {
+        serialised_message: Vec<u8>,
+        identities: Vec<TestIdType>,
+        signature: SignW,
+    }
+
+    impl fmt::Debug for TestGroupClaim {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            write!(f, "Message({:?})", self.serialised_message)
+        }
+    }
+
+    impl TestGroupClaim {
+        pub fn new(serialised_message: Vec<u8>,
+                   signature: sign::Signature,
+                   identities: Vec<TestIdType>) -> TestGroupClaim {
+
+            TestGroupClaim { serialised_message: serialised_message,
+                             signature: SignW(signature),
+                             identities: identities }
+        }
+    }
+
+    impl GroupClaimTrait<TestIdType> for TestGroupClaim {
+        fn group_identities(&self) -> Vec<TestIdType> {
+            self.identities.clone()
+        }
+    }
+
+#[test]
+    fn key_sentinel() {
+        let mut sentinel: KeySentinel<TestRequest, TestName, TestIdType, TestGroupClaim>
+            = KeySentinel::new(CLAIMS_THRESHOLD, KEYS_THRESHOLD);
+        let random_message = generate_random_message();
+        let mut tuples = Vec::new();
+        for i in 0..KEYS_THRESHOLD + 1 {
+            let key_pair = sign::gen_keypair();
+            let signature = sign::sign_detached(&random_message, &key_pair.1);
+            tuples.push((TestName(i as u32), key_pair.0, signature));
+        }
+
+        let request = TestRequest::new(random::<usize>(), TestName((KEYS_THRESHOLD + 1) as u32));
+        let name_pubs = tuples.iter().map(|&(ref name, ref public_key, _)|
+                                            TestIdType { name: name.clone(),
+                                                         public_key: public_key.clone().0 })
+                                     .collect::<Vec<_>>();
+        for index in 0..KEYS_THRESHOLD + 1 {
+            let group_claim = TestGroupClaim::new(random_message.clone(),
+                                                  tuples[index].2.clone(),
+                                                  name_pubs.clone());
+            if index < KEYS_THRESHOLD {
+                assert!(sentinel.add_identities(request.clone(),
+                                                tuples[index].0.clone(),
+                                                group_claim.serialised_message.clone(),
+                                                group_claim.signature.0.clone(),
+                                                group_claim).is_none());
+                continue;
+            }
+            assert!(sentinel.add_identities(request.clone(),
+                                            tuples[KEYS_THRESHOLD].0.clone(),
+                                            group_claim.serialised_message.clone(),
+                                            group_claim.signature.0.clone(),
+                                            group_claim).is_some());
+        }
+    }
+}
