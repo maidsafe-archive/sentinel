@@ -199,37 +199,48 @@ mod test {
         }
     }
 
-#[test]
+    #[test]
     fn key_sentinel() {
         let mut sentinel: KeySentinel<TestRequest, TestName, TestIdType, TestGroupClaim>
             = KeySentinel::new(CLAIMS_THRESHOLD, KEYS_THRESHOLD);
+
         let random_message = generate_random_message();
-        let mut tuples = Vec::new();
+        let mut names      = Vec::new();
+        let mut pubs       = Vec::new();
+        let mut signatures = Vec::new();
+
         for i in 0..KEYS_THRESHOLD + 1 {
             let key_pair = sign::gen_keypair();
-            let signature = sign::sign_detached(&random_message, &key_pair.1);
-            tuples.push((TestName(i as u32), key_pair.0, signature));
+
+            names.push(TestName(i as u32));
+            pubs.push(key_pair.0);
+            signatures.push(sign::sign_detached(&random_message, &key_pair.1));
         }
 
         let request = TestRequest::new(random::<usize>(), TestName((KEYS_THRESHOLD + 1) as u32));
-        let name_pubs = tuples.iter().map(|&(ref name, ref public_key, _)|
-                                            TestIdType { name: name.clone(),
-                                                         public_key: public_key.clone().0 })
-                                     .collect::<Vec<_>>();
+
+        let name_pubs = names.iter().zip(pubs.iter())
+                             .map(|(ref name, ref public_key)|
+                                      TestIdType { name: (*name).clone(),
+                                                   public_key: public_key.clone().0 })
+                             .collect::<Vec<_>>();
+
         for index in 0..KEYS_THRESHOLD + 1 {
             let group_claim = TestGroupClaim::new(name_pubs.clone());
+
             if index < KEYS_THRESHOLD {
                 assert!(sentinel.add_identities(request.clone(),
-                                                tuples[index].0.clone(),
+                                                names[index].clone(),
                                                 random_message.clone(),
-                                                tuples[index].2.clone(),
+                                                signatures[index].clone(),
                                                 group_claim).is_none());
                 continue;
             }
+
             assert!(sentinel.add_identities(request.clone(),
-                                            tuples[KEYS_THRESHOLD].0.clone(),
+                                            names[KEYS_THRESHOLD].clone(),
                                             random_message.clone(),
-                                            tuples[KEYS_THRESHOLD].2.clone(),
+                                            signatures[KEYS_THRESHOLD].clone(),
                                             group_claim).is_some());
         }
     }
