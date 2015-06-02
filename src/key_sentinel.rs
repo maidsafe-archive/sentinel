@@ -222,12 +222,10 @@ mod test {
     }
 
 #[test]
-    fn make_key_sentinel() {
+    fn key_sentinel() {
         let mut sentinel: KeySentinel<TestRequest, TestName, TestIdType, TestGroupClaim>
             = KeySentinel::new(CLAIMS_THRESHOLD, KEYS_THRESHOLD);
-
         let random_message = generate_random_message();
-
         let mut tuples = Vec::new();
         for i in 0..KEYS_THRESHOLD + 1 {
             let key_pair = sign::gen_keypair();
@@ -235,13 +233,11 @@ mod test {
             tuples.push((TestName(i as u32), key_pair.0, signature));
         }
 
-        let request = TestRequest::new(random::<usize>(), TestName((KEYS_THRESHOLD+1) as u32));
-
+        let request = TestRequest::new(random::<usize>(), TestName((KEYS_THRESHOLD + 1) as u32));
         let name_pubs = tuples.iter().map(|&(ref name, ref public_key, _)|
                                             TestIdType { name: name.clone(),
                                                          public_key: public_key.clone().0 })
                                      .collect::<Vec<_>>();
-
         for index in 0..KEYS_THRESHOLD + 1 {
             let group_claim = TestGroupClaim::new(random_message.clone(),
                                                   tuples[index].2.clone(),
