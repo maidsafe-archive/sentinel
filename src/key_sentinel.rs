@@ -44,7 +44,7 @@ pub struct KeySentinel<Request, Name, IdType, GroupClaim>
         where Request: Eq + PartialOrd + Ord + Clone,
               Name:    Eq + PartialOrd + Ord + Clone + Debug,
               IdType:  Eq + PartialOrd + Ord + Clone + IdTrait<Name>,
-              GroupClaim:  Eq + PartialOrd + Ord + Clone + GroupClaimTrait<IdType> + Debug, {
+              GroupClaim:  Eq + PartialOrd + Ord + Clone + GroupClaimTrait<IdType>, {
     cache: LruCache<Request, (KeyStore<Name>, Map<Name, Set<(GroupClaim, SerialisedClaim, SignW)>>)>,
     claim_threshold: usize,
     keys_threshold: usize,
@@ -55,7 +55,7 @@ impl<Request, Name, IdType, GroupClaim> KeySentinel<Request, Name, IdType, Group
     where Request: Eq + PartialOrd + Ord + Clone,
           Name:    Eq + PartialOrd + Ord + Clone + Debug,
           IdType:  Eq + PartialOrd + Ord + Clone + IdTrait<Name>,
-          GroupClaim: Eq + PartialOrd + Ord + Clone + GroupClaimTrait<IdType> + Debug, {
+          GroupClaim: Eq + PartialOrd + Ord + Clone + GroupClaimTrait<IdType>, {
 
     #[allow(dead_code)]
     pub fn new(claim_threshold: usize, keys_threshold: usize)
@@ -114,7 +114,7 @@ impl<Request, Name, IdType, GroupClaim> KeySentinel<Request, Name, IdType, Group
                 }
             }
             None
-        }).collect::<Set<_>>();
+        }).collect::<Vec<_>>();
 
         if verified_claims.len() < claim_threshold {
             return None;
@@ -142,8 +142,6 @@ mod test {
     use super::*;
     use rand::random;
     use sodiumoxide::crypto::sign;
-    use std::fmt;
-    use wrappers::SignW;
 
     const MESSAGE_SIZE: usize = 4;
     const CLAIMS_THRESHOLD: usize = 10;
@@ -187,26 +185,11 @@ mod test {
     }
 
     #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
-    struct TestGroupClaim {
-        serialised_message: Vec<u8>,
-        identities: Vec<TestIdType>,
-        signature: SignW,
-    }
-
-    impl fmt::Debug for TestGroupClaim {
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            write!(f, "Message({:?})", self.serialised_message)
-        }
-    }
+    struct TestGroupClaim { identities: Vec<TestIdType>, }
 
     impl TestGroupClaim {
-        pub fn new(serialised_message: Vec<u8>,
-                   signature: sign::Signature,
-                   identities: Vec<TestIdType>) -> TestGroupClaim {
-
-            TestGroupClaim { serialised_message: serialised_message,
-                             signature: SignW(signature),
-                             identities: identities }
+        pub fn new(identities: Vec<TestIdType>) -> TestGroupClaim {
+            TestGroupClaim { identities: identities }
         }
     }
 
@@ -234,21 +217,19 @@ mod test {
                                                          public_key: public_key.clone().0 })
                                      .collect::<Vec<_>>();
         for index in 0..KEYS_THRESHOLD + 1 {
-            let group_claim = TestGroupClaim::new(random_message.clone(),
-                                                  tuples[index].2.clone(),
-                                                  name_pubs.clone());
+            let group_claim = TestGroupClaim::new(name_pubs.clone());
             if index < KEYS_THRESHOLD {
                 assert!(sentinel.add_identities(request.clone(),
                                                 tuples[index].0.clone(),
-                                                group_claim.serialised_message.clone(),
-                                                group_claim.signature.0.clone(),
+                                                random_message.clone(),
+                                                tuples[index].2.clone(),
                                                 group_claim).is_none());
                 continue;
             }
             assert!(sentinel.add_identities(request.clone(),
                                             tuples[KEYS_THRESHOLD].0.clone(),
-                                            group_claim.serialised_message.clone(),
-                                            group_claim.signature.0.clone(),
+                                            random_message.clone(),
+                                            tuples[KEYS_THRESHOLD].2.clone(),
                                             group_claim).is_some());
         }
     }
