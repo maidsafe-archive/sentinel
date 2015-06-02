@@ -20,6 +20,7 @@ use sodiumoxide::crypto::sign;
 use std::collections::{BTreeSet, BTreeMap};
 use key_store::KeyStore;
 use std::marker::PhantomData;
+use std::fmt::Debug;
 
 #[allow(dead_code)]
 const MAX_REQUEST_COUNT: usize = 1000;
@@ -40,9 +41,9 @@ pub trait GroupClaimTrait<IdTrait> {
 #[allow(dead_code)]
 pub struct KeySentinel<Request, Name, IdType, GroupClaim>
         where Request: Eq + PartialOrd + Ord + Clone,
-              Name:    Eq + PartialOrd + Ord + Clone,
+              Name:    Eq + PartialOrd + Ord + Clone + Debug,
               IdType:  Eq + PartialOrd + Ord + Clone + IdTrait<Name>,
-              GroupClaim:  Eq + PartialOrd + Ord + Clone + GroupClaimTrait<IdType>, {
+              GroupClaim:  Eq + PartialOrd + Ord + Clone + GroupClaimTrait<IdType> + Debug, {
     cache: LruCache<Request, (KeyStore<Name>, Map<Name, Set<GroupClaim>>)>,
     claim_threshold: usize,
     keys_threshold: usize,
@@ -51,9 +52,9 @@ pub struct KeySentinel<Request, Name, IdType, GroupClaim>
 
 impl<Request, Name, IdType, GroupClaim> KeySentinel<Request, Name, IdType, GroupClaim>
     where Request: Eq + PartialOrd + Ord + Clone,
-          Name:    Eq + PartialOrd + Ord + Clone,
+          Name:    Eq + PartialOrd + Ord + Clone + Debug,
           IdType:  Eq + PartialOrd + Ord + Clone + IdTrait<Name>,
-          GroupClaim: Eq + PartialOrd + Ord + Clone + GroupClaimTrait<IdType>, {
+          GroupClaim: Eq + PartialOrd + Ord + Clone + GroupClaimTrait<IdType> + Debug, {
 
     #[allow(dead_code)]
     pub fn new(claim_threshold: usize, keys_threshold: usize)
@@ -132,23 +133,20 @@ impl<Request, Name, IdType, GroupClaim> KeySentinel<Request, Name, IdType, Group
 mod test {
     use super::*;
     use rand::random;
-    use sodiumoxide::crypto;
-    use std::cmp::Ordering;
+    use sodiumoxide::crypto::sign;
     use std::fmt;
 
-    const NAMESIZE: usize = 64;
+    const MESSAGE_SIZE: usize = 4;
     const CLAIMS_THRESHOLD: usize = 10;
     const KEYS_THRESHOLD: usize = 10;
 
     #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
-    pub struct TestName {
-        pub data: Vec<u8>
-    }
+    pub struct TestName(pub u32);
 
-    fn generate_random_name() -> TestName {
-        let mut arr = [0u8;NAMESIZE];
-        for i in (0..NAMESIZE) { arr[i] = random::<u8>(); }
-        TestName { data : arr.to_vec() }
+    fn generate_random_message() -> Vec<u8> {
+        let mut arr = [0u8;MESSAGE_SIZE];
+        for i in (0..MESSAGE_SIZE) { arr[i] = random::<u8>(); }
+        arr.to_vec()
     }
 
     #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
@@ -163,30 +161,10 @@ mod test {
         }
     }
 
-    #[derive(Clone)]
+    #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
     struct TestIdType {
         name: TestName,
-        public_key: crypto::sign::PublicKey
-    }
-
-    impl PartialEq for TestIdType {
-        fn eq(&self, other: &TestIdType) -> bool {
-            self.name == other.name
-        }
-    }
-
-    impl Eq for TestIdType {}
-
-    impl PartialOrd for TestIdType {
-        fn partial_cmp(&self, other: &TestIdType) -> Option<Ordering> {
-            self.name.partial_cmp(&other.name)
-        }
-    }
-
-    impl Ord for TestIdType {
-        fn cmp(&self, other: &Self) -> Ordering {
-            self.name.cmp(&other.name)
-        }
+        public_key: [u8;sign::PUBLICKEYBYTES],
     }
 
     impl IdTrait<TestName> for TestIdType {
@@ -194,81 +172,89 @@ mod test {
             self.name.clone()
         }
 
-        fn public_key(&self) -> crypto::sign::PublicKey {
-            self.public_key
+        fn public_key(&self) -> sign::PublicKey {
+            sign::PublicKey(self.public_key)
         }
     }
 
-    #[derive(Clone)]
+    #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
     struct TestGroupClaim {
         serialised_message: Vec<u8>,
-        signature: crypto::sign::Signature,
-        identities: Vec<TestIdType>
+        identities: Vec<TestIdType>,
+        signature: Vec<u8>,
     }
 
     impl fmt::Debug for TestGroupClaim {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            write!(f, "serialised_message: {:?} ", self.serialised_message)
-        }
-    }
-
-    impl PartialEq for TestGroupClaim {
-        fn eq(&self, other: &TestGroupClaim) -> bool {
-            self.serialised_message == other.serialised_message
-        }
-    }
-
-    impl Eq for TestGroupClaim {}
-
-    impl PartialOrd for TestGroupClaim {
-        fn partial_cmp(&self, other: &TestGroupClaim) -> Option<Ordering> {
-            self.serialised_message.partial_cmp(&other.serialised_message)
-        }
-    }
-
-    impl Ord for TestGroupClaim {
-        fn cmp(&self, other: &Self) -> Ordering {
-            self.serialised_message.cmp(&other.serialised_message)
+            write!(f, "Message({:?})", self.serialised_message)
         }
     }
 
     impl TestGroupClaim {
-        pub fn new(serialised_message: Vec<u8>, signature: crypto::sign::Signature, identities: Vec<TestIdType>) -> TestGroupClaim {
-            TestGroupClaim { serialised_message: serialised_message, signature: signature, identities: identities }
+        pub fn new(serialised_message: Vec<u8>,
+                   signature: sign::Signature,
+                   identities: Vec<TestIdType>) -> TestGroupClaim {
+
+            let mut sig = Vec::<u8>::new();
+
+            for c in signature.0.iter() { sig.push(c.clone()); }
+
+            TestGroupClaim { serialised_message: serialised_message,
+                             signature: sig,
+                             identities: identities }
         }
     }
 
     impl GroupClaimTrait<TestIdType> for TestGroupClaim {
         fn group_identities(&self) -> Vec<TestIdType> {
-            let ids: Vec<TestIdType> = Vec::new();
-            ids
+            self.identities.clone()
         }
 
-        fn verify_public_key(&self, public_key: &crypto::sign::PublicKey) -> bool {
-            crypto::sign::verify_detached(&self.signature, &self.serialised_message, public_key)
+        fn verify_public_key(&self, public_key: &sign::PublicKey) -> bool {
+            let mut sig = [0u8;sign::SIGNATUREBYTES];
+            let mut i = 0;
+            for byte in &self.signature {
+                sig[i] = byte.clone();
+                i += 1;
+            }
+            sign::verify_detached(&sign::Signature(sig), &self.serialised_message, public_key)
         }
     }
 
 #[test]
     fn make_key_sentinel() {
-        let mut sentinel: KeySentinel<TestRequest, TestName, TestIdType, TestGroupClaim> = KeySentinel::new(CLAIMS_THRESHOLD, KEYS_THRESHOLD);
-        let random_message = generate_random_name().data;
+        let mut sentinel: KeySentinel<TestRequest, TestName, TestIdType, TestGroupClaim>
+            = KeySentinel::new(CLAIMS_THRESHOLD, KEYS_THRESHOLD);
+
+        let random_message = generate_random_message();
+
         let mut tuples = Vec::new();
-        for _ in 0..KEYS_THRESHOLD + 1 {
-            let key_pair = crypto::sign::gen_keypair();
-            let signature = crypto::sign::sign_detached(&random_message, &key_pair.1);
-            tuples.push((generate_random_name(), key_pair.0, signature));
+        for i in 0..KEYS_THRESHOLD + 1 {
+            let key_pair = sign::gen_keypair();
+            let signature = sign::sign_detached(&random_message, &key_pair.1);
+            tuples.push((TestName(i as u32), key_pair.0, signature));
         }
 
-        let request = TestRequest::new(random::<usize>(), generate_random_name());
-        let name_pubs = tuples.iter().map(|&(ref name, ref public_key, _)| TestIdType { name: name.clone(), public_key: public_key.clone() }).collect::<Vec<_>>();
+        let request = TestRequest::new(random::<usize>(), TestName((KEYS_THRESHOLD+1) as u32));
+
+        let name_pubs = tuples.iter().map(|&(ref name, ref public_key, _)|
+                                            TestIdType { name: name.clone(),
+                                                         public_key: public_key.clone().0 })
+                                     .collect::<Vec<_>>();
+
         for index in 0..KEYS_THRESHOLD + 1 {
-            let group_claim = TestGroupClaim::new(random_message.clone(), tuples[index].2.clone(), name_pubs.clone());
+            let group_claim = TestGroupClaim::new(random_message.clone(),
+                                                  tuples[index].2.clone(),
+                                                  name_pubs.clone());
             if index < KEYS_THRESHOLD {
-                assert!(sentinel.add_identities(request.clone(), tuples[index].0.clone(), group_claim).is_none());
+                assert!(sentinel.add_identities(request.clone(),
+                                                tuples[index].0.clone(),
+                                                group_claim).is_none());
                 continue;
             }
-            assert!(sentinel.add_identities(request.clone(), tuples[KEYS_THRESHOLD].0.clone(), group_claim).is_some());
+            assert!(sentinel.add_identities(request.clone(),
+                                            tuples[KEYS_THRESHOLD].0.clone(),
+                                            group_claim).is_some());
         }
     }
 }
