@@ -56,6 +56,9 @@ impl<Name> KeyStore<Name> where Name: Eq + PartialOrd + Ord + Clone {
                   .insert(sender);
     }
 
+    #[allow(dead_code)]
+    pub fn len(&self) -> usize { self.cache.len() }
+
     /// Returns a vector of keys belonging to `target`, for whom we've received the key
     /// from at least a quorum size of unique senders.
     pub fn get_accumulated_keys(&mut self, target: &Name) -> Vec<sign::PublicKey> {
