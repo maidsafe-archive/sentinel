@@ -17,7 +17,6 @@
 
 use lru_time_cache::LruCache;
 use std::collections::{BTreeSet, BTreeMap};
-use super::SerialisedClaim;
 
 type Map<K,V> = BTreeMap<K,V>;
 type Set<V>   = BTreeSet<V>;
@@ -26,45 +25,47 @@ type Set<V>   = BTreeSet<V>;
 const MAX_REQUEST_COUNT: usize = 1000;
 
 #[allow(dead_code)]
-pub struct AccountSentinel<Request, Name>
+pub struct AccountSentinel<Request, Name, Claim>
     where Request: Eq + PartialOrd + Ord + Clone,
-          Name:    Eq + PartialOrd + Ord + Clone, {
+          Name:    Eq + PartialOrd + Ord + Clone,
+          Claim:   Eq + PartialOrd + Ord + Clone, {
 
-    requests: LruCache<Request, Map<SerialisedClaim, Set<Name>>>,
+    requests: LruCache<Request, Map<Name, Claim>>,
 }
 
-impl<Request, Name> AccountSentinel<Request, Name>
-    where Request:         Eq + PartialOrd + Ord + Clone,
-          Name:            Eq + PartialOrd + Ord + Clone, {
+impl<Request, Name, Claim> AccountSentinel<Request, Name, Claim>
+    where Request: Eq + PartialOrd + Ord + Clone,
+          Name:    Eq + PartialOrd + Ord + Clone,
+          Claim:   Eq + PartialOrd + Ord + Clone, {
 
     #[allow(dead_code)]
-    pub fn new() -> AccountSentinel<Request, Name> {
+    pub fn new() -> AccountSentinel<Request, Name, Claim> {
         AccountSentinel {
             requests: LruCache::with_capacity(MAX_REQUEST_COUNT),
         }
     }
 
     #[allow(dead_code)]
-    pub fn add_claim(&mut self, threshold: usize,
-                                request: Request,
-                                sender: Name,
-                                claim: SerialisedClaim)
-        -> Option<SerialisedClaim> {
-
+    pub fn add_claim(&mut self, threshold: usize, request: Request, sender: Name, claim: Claim)
+        -> Option<Claim> {
         {
-            let claims  = self.requests.entry(request.clone()).or_insert_with(||Map::new());
-            let senders = claims.entry(claim.clone()).or_insert_with(||Set::new());
-
-            senders.insert(sender);
-
-            if senders.len() >= threshold {
-                Some((request, claim))
-            } else {
-                None
+            let map = self.requests.entry(request.clone()).or_insert_with(||Map::new());
+            map.insert(sender, claim);
+            if map.len() < threshold {
+                return None;
             }
+            Self::pick_median(map).map(|claim|(request, claim))
         }.map(|(request, claim)| {
             self.requests.remove(&request);
             claim
         })
+    }
+
+    fn pick_median(map: &Map<Name, Claim>) -> Option<Claim> {
+        if map.is_empty() { return None }
+        let mut claims = map.iter().map(|(_, ref claim)| claim.clone())
+                            .collect::<Vec<_>>();
+        claims.sort();
+        Some(claims[claims.len() / 2].clone())
     }
 }
