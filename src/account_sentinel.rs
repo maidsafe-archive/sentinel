@@ -66,6 +66,6 @@ impl<Request, Name, Claim> AccountSentinel<Request, Name, Claim>
         let mut claims = map.iter().map(|(_, ref claim)| claim.clone())
                             .collect::<Vec<_>>();
         claims.sort();
-        Some(claims[claims.len() / 2].clone())
+        Some(claims[(claims.len() - 1) / 2].clone())
     }
 }
