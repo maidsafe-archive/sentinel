@@ -21,6 +21,8 @@ use std::collections::{BTreeSet, BTreeMap};
 use key_store::KeyStore;
 use std::marker::PhantomData;
 use std::fmt::Debug;
+use super::{verify_signature, SerialisedClaim};
+use wrappers::SignW;
 
 #[allow(dead_code)]
 const MAX_REQUEST_COUNT: usize = 1000;
@@ -35,7 +37,6 @@ pub trait IdTrait<NameType> {
 
 pub trait GroupClaimTrait<IdTrait> {
     fn group_identities(&self) -> Vec<IdTrait>;
-    fn verify_public_key(&self, _: &sign::PublicKey) -> bool;
 }
 
 #[allow(dead_code)]
@@ -43,8 +44,8 @@ pub struct KeySentinel<Request, Name, IdType, GroupClaim>
         where Request: Eq + PartialOrd + Ord + Clone,
               Name:    Eq + PartialOrd + Ord + Clone + Debug,
               IdType:  Eq + PartialOrd + Ord + Clone + IdTrait<Name>,
-              GroupClaim:  Eq + PartialOrd + Ord + Clone + GroupClaimTrait<IdType> + Debug, {
-    cache: LruCache<Request, (KeyStore<Name>, Map<Name, Set<GroupClaim>>)>,
+              GroupClaim:  Eq + PartialOrd + Ord + Clone + GroupClaimTrait<IdType>, {
+    cache: LruCache<Request, (KeyStore<Name>, Map<Name, Set<(GroupClaim, SerialisedClaim, SignW)>>)>,
     claim_threshold: usize,
     keys_threshold: usize,
     phantom: PhantomData<IdType>,
@@ -54,7 +55,7 @@ impl<Request, Name, IdType, GroupClaim> KeySentinel<Request, Name, IdType, Group
     where Request: Eq + PartialOrd + Ord + Clone,
           Name:    Eq + PartialOrd + Ord + Clone + Debug,
           IdType:  Eq + PartialOrd + Ord + Clone + IdTrait<Name>,
-          GroupClaim: Eq + PartialOrd + Ord + Clone + GroupClaimTrait<IdType> + Debug, {
+          GroupClaim: Eq + PartialOrd + Ord + Clone + GroupClaimTrait<IdType>, {
 
     #[allow(dead_code)]
     pub fn new(claim_threshold: usize, keys_threshold: usize)
@@ -69,9 +70,11 @@ impl<Request, Name, IdType, GroupClaim> KeySentinel<Request, Name, IdType, Group
 
     #[allow(dead_code)]
     pub fn add_identities(&mut self,
-                          request : Request,
-                          sender  : Name,
-                          claim   : GroupClaim)
+                          request:    Request,
+                          sender:     Name,
+                          serialised: SerialisedClaim,
+                          signature:  sign::Signature,
+                          claim:      GroupClaim)
         -> Option<(Request, Vec<IdType>)> {
 
         let retval = {
@@ -87,7 +90,8 @@ impl<Request, Name, IdType, GroupClaim> KeySentinel<Request, Name, IdType, Group
                 keys.add_key(id.name(), sender.clone(), id.public_key());
             }
 
-            claims.entry(sender).or_insert_with(||Set::new()).insert(claim);
+            claims.entry(sender).or_insert_with(||Set::new())
+                .insert((claim, serialised, SignW(signature)));
 
             Self::try_selecting_group(keys, claims, self.claim_threshold)
                 .map(|ids|(request, ids))
@@ -100,17 +104,17 @@ impl<Request, Name, IdType, GroupClaim> KeySentinel<Request, Name, IdType, Group
     }
 
     fn try_selecting_group(key_store: &mut KeyStore<Name>,
-                           claims: &Map<Name, Set<GroupClaim>>,
+                           claims: &Map<Name, Set<(GroupClaim, SerialisedClaim, SignW)>>,
                            claim_threshold: usize) -> Option<Vec<IdType>> {
 
         let verified_claims = claims.iter().filter_map(|(name, claims)| {
-            for claim in claims {
-                if Self::verify_claim(name, key_store, claim) {
+            for &(ref claim, ref serialised, ref signature) in claims {
+                if Self::verify_claim(name, key_store, serialised, &(signature.0)) {
                     return Some(claim);
                 }
             }
             None
-        }).collect::<Set<_>>();
+        }).collect::<Vec<_>>();
 
         if verified_claims.len() < claim_threshold {
             return None;
@@ -119,10 +123,14 @@ impl<Request, Name, IdType, GroupClaim> KeySentinel<Request, Name, IdType, Group
         Some(verified_claims.iter().flat_map(|claim| claim.group_identities()).collect())
     }
 
-    fn verify_claim(author: &Name, key_store: &mut KeyStore<Name>, claim: &GroupClaim) -> bool {
+    fn verify_claim(author: &Name,
+                    key_store: &mut KeyStore<Name>,
+                    serialised: &SerialisedClaim,
+                    signature: &sign::Signature) -> bool {
         for public_key in key_store.get_accumulated_keys(&author) {
-            if claim.verify_public_key(&public_key) {
-                return true
+            
+            if verify_signature(signature, &public_key, serialised).is_some() {
+                return true;
             }
         }
         false
@@ -134,7 +142,6 @@ mod test {
     use super::*;
     use rand::random;
     use sodiumoxide::crypto::sign;
-    use std::fmt;
 
     const MESSAGE_SIZE: usize = 4;
     const CLAIMS_THRESHOLD: usize = 10;
@@ -178,30 +185,11 @@ mod test {
     }
 
     #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
-    struct TestGroupClaim {
-        serialised_message: Vec<u8>,
-        identities: Vec<TestIdType>,
-        signature: Vec<u8>,
-    }
-
-    impl fmt::Debug for TestGroupClaim {
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            write!(f, "Message({:?})", self.serialised_message)
-        }
-    }
+    struct TestGroupClaim { identities: Vec<TestIdType>, }
 
     impl TestGroupClaim {
-        pub fn new(serialised_message: Vec<u8>,
-                   signature: sign::Signature,
-                   identities: Vec<TestIdType>) -> TestGroupClaim {
-
-            let mut sig = Vec::<u8>::new();
-
-            for c in signature.0.iter() { sig.push(c.clone()); }
-
-            TestGroupClaim { serialised_message: serialised_message,
-                             signature: sig,
-                             identities: identities }
+        pub fn new(identities: Vec<TestIdType>) -> TestGroupClaim {
+            TestGroupClaim { identities: identities }
         }
     }
 
@@ -209,47 +197,50 @@ mod test {
         fn group_identities(&self) -> Vec<TestIdType> {
             self.identities.clone()
         }
-
-        fn verify_public_key(&self, public_key: &sign::PublicKey) -> bool {
-            let mut sig = [0u8;sign::SIGNATUREBYTES];
-            let mut i = 0;
-            for byte in &self.signature {
-                sig[i] = byte.clone();
-                i += 1;
-            }
-            sign::verify_detached(&sign::Signature(sig), &self.serialised_message, public_key)
-        }
     }
 
-#[test]
+    #[test]
     fn key_sentinel() {
         let mut sentinel: KeySentinel<TestRequest, TestName, TestIdType, TestGroupClaim>
             = KeySentinel::new(CLAIMS_THRESHOLD, KEYS_THRESHOLD);
+
         let random_message = generate_random_message();
-        let mut tuples = Vec::new();
+        let mut names      = Vec::new();
+        let mut pubs       = Vec::new();
+        let mut signatures = Vec::new();
+
         for i in 0..KEYS_THRESHOLD + 1 {
             let key_pair = sign::gen_keypair();
-            let signature = sign::sign_detached(&random_message, &key_pair.1);
-            tuples.push((TestName(i as u32), key_pair.0, signature));
+
+            names.push(TestName(i as u32));
+            pubs.push(key_pair.0);
+            signatures.push(sign::sign_detached(&random_message, &key_pair.1));
         }
 
         let request = TestRequest::new(random::<usize>(), TestName((KEYS_THRESHOLD + 1) as u32));
-        let name_pubs = tuples.iter().map(|&(ref name, ref public_key, _)|
-                                            TestIdType { name: name.clone(),
-                                                         public_key: public_key.clone().0 })
-                                     .collect::<Vec<_>>();
+
+        let name_pubs = names.iter().zip(pubs.iter())
+                             .map(|(ref name, ref public_key)|
+                                      TestIdType { name: (*name).clone(),
+                                                   public_key: public_key.clone().0 })
+                             .collect::<Vec<_>>();
+
         for index in 0..KEYS_THRESHOLD + 1 {
-            let group_claim = TestGroupClaim::new(random_message.clone(),
-                                                  tuples[index].2.clone(),
-                                                  name_pubs.clone());
+            let group_claim = TestGroupClaim::new(name_pubs.clone());
+
             if index < KEYS_THRESHOLD {
                 assert!(sentinel.add_identities(request.clone(),
-                                                tuples[index].0.clone(),
+                                                names[index].clone(),
+                                                random_message.clone(),
+                                                signatures[index].clone(),
                                                 group_claim).is_none());
                 continue;
             }
+
             assert!(sentinel.add_identities(request.clone(),
-                                            tuples[KEYS_THRESHOLD].0.clone(),
+                                            names[KEYS_THRESHOLD].clone(),
+                                            random_message.clone(),
+                                            signatures[KEYS_THRESHOLD].clone(),
                                             group_claim).is_some());
         }
     }
