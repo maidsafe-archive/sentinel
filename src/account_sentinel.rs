@@ -69,3 +69,69 @@ impl<Request, Name, Claim> AccountSentinel<Request, Name, Claim>
         Some(claims[(claims.len() - 1) / 2].clone())
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    type Request = u8;
+    type Name    = u8;
+    type Claim   = u32;
+
+    fn test_single_request(threshold: usize) {
+        let request   = 0 as Request;
+        let mut sentinel = AccountSentinel::<Request, Name, Claim>::new();
+
+        for i in (0..threshold-1) {
+            assert!(sentinel.add_claim(threshold, request, i as Name, i as Claim).is_none());
+        }
+
+        let n = threshold - 1;
+        let result = sentinel.add_claim(threshold, request, n as Name, n as Claim);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), ((threshold - 1) / 2) as Claim);
+
+        // Adding more should start accumulating from the beginning.
+        for i in (threshold..(2*threshold-1)) {
+            assert!(sentinel.add_claim(threshold, request, i as Name, i as Claim).is_none());
+        }
+
+        let n = 2 * threshold - 1;
+        let result = sentinel.add_claim(threshold, request, n as Name, n as Claim);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), (threshold + (threshold - 1) / 2) as Claim);
+    }
+
+    #[test]
+    fn zero_threshold() {
+        let mut sentinel = AccountSentinel::<Request, Name, Claim>::new();
+        assert_eq!(sentinel.add_claim(0, 0 as Request, 0 as Name, 0 as Claim), Some(0 as Claim));
+    }
+
+    #[test]
+    fn single_request() {
+        for threshold in (1..100) {
+            test_single_request(threshold);
+        }
+    }
+
+    #[test]
+    fn multi_request() {
+        let request_count = 30;
+        let threshold = 10;
+        let mut sentinel = AccountSentinel::<Request, Name, Claim>::new();
+
+        for i in (0..threshold-1) {
+            for request in (0..request_count) {
+                assert!(sentinel.add_claim(threshold, request, i as Name, i as Claim).is_none());
+            }
+        }
+
+        for request in (0..request_count) {
+            let n = threshold - 1;
+            let result = sentinel.add_claim(threshold, request, n as Name, n as Claim);
+            assert!(result.is_some());
+            assert_eq!(result.unwrap(), ((threshold - 1) / 2) as Claim);
+        }
+    }
+}
