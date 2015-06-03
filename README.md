@@ -22,8 +22,8 @@ Confirm group based consensus on messages in a p2p network
 - [x] [MAID-1023](https://maidsafe.atlassian.net/browse/MAID-1023) Test KeyStore
 - [x] [MAID-1024](https://maidsafe.atlassian.net/browse/MAID-1024) Implement PureSentinel
 - [x] [MAID-1025](https://maidsafe.atlassian.net/browse/MAID-1025) Test PureSentinel
-- [ ] [MAID-1026](https://maidsafe.atlassian.net/browse/MAID-1026) Implement AccountSentinel
-- [ ] [MAID-1027](https://maidsafe.atlassian.net/browse/MAID-1027) Test AccountSentinel
+- [x] [MAID-1026](https://maidsafe.atlassian.net/browse/MAID-1026) Implement AccountSentinel
+- [x] [MAID-1027](https://maidsafe.atlassian.net/browse/MAID-1027) Test AccountSentinel
 - [x] [MAID-1030](https://maidsafe.atlassian.net/browse/MAID-1030) Implement KeySentinel
 - [x] [MAID-1031](https://maidsafe.atlassian.net/browse/MAID-1031) Test KeySentinel
 
