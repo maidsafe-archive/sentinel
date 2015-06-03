@@ -1,7 +1,7 @@
 [package]
 
 name = "sentinel"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["MaidSafe Developers <dev@maidsafe.net>"]
 description = "p2p network group consensus and PKI like ID confirmation"
 documentation = "http://dirvine.github.io/sentinel/"
@@ -16,11 +16,5 @@ rustc-serialize = "*"
 cbor = "*"
 sodiumoxide = "0.0.5"
 rand = "*"
-#accumulator = "0.0.1"
-#lru_time_cache = "0.1.7"
-
-[dependencies.accumulator]
-git = "https://github.com/inetic/accumulator"
-
-[dependencies.lru_time_cache]
-git = "https://github.com/inetic/lru_time_cache"
+accumulator = "0.0.2"
+lru_time_cache = "0.1.8"
