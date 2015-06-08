@@ -32,6 +32,7 @@
 //! can be one or higher.
 //! The claims_threshold specifies a minimal threshold on the number of verified claims before
 //! sentinel will attempt to merge these verified claims.
+#![forbid(bad_style, warnings)]
 
 extern crate rustc_serialize;
 extern crate accumulator;
