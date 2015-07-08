@@ -15,7 +15,7 @@
 #Overview
 Confirm group based consensus on messages in a p2p network
 
-#Todo Items
+## [0.1.1] - RUST-3 Tasks
 
 - [ ] [MAID-1151](https://maidsafe.atlassian.net/browse/MAID-1151) MAID-1152 Rename Sentinel to PureSentinel in routing
 - [ ] [MAID-1153](https://maidsafe.atlassian.net/browse/MAID-1153) MAID-1152 Modify PureSentinel to use dynamic threshold values
