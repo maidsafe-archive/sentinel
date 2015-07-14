@@ -8,12 +8,12 @@
 - Remove dependency on the custom fork of the sodiumdioxide library
 - Implement KeyStore
 - Test KeyStore
-- Implement Sentinel
-- Test Sentinel
+- Implement PureSentinel
+- Test PureSentinel
 - Implement AccountSentinel
 - Test AccountSentinel
 - Implement KeySentinel
 - Test KeySentinel
 
 ## [0.0.0 - 0.0.1]
-- Reference implementation for the Sentinel
+- Reference implementation for the PureSentinel
