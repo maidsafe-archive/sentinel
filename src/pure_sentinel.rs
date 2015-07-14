@@ -15,14 +15,14 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-//! Sentinel cryptographically confirms the origin of a claim in a decentralised network.
+//! PureSentinel cryptographically confirms the origin of a claim in a decentralised network.
 //!
 //! A claim has to implement Claimable in order to be verifiable and mergeable.
-//! A request has to implement GetSigningKeys such that Sentinel can aqcuire
+//! A request has to implement GetSigningKeys such that PureSentinel can aqcuire
 //! the necessary public signing keys.
-//! The request is passed immutably through sentinel
+//! The request is passed immutably through pure sentinel
 //! and is used as a key to group claims and corresponding keys.
-//! When sentinel resolves a threshold on verified and merged message,
+//! When pure sentinel resolves a threshold on verified and merged message,
 //! it returns the requestor key and the merged claim.
 //! Claimant names and associated signatures are discarded after succesful resolution,
 //! as such abstracting the original request into a resolved claim.
@@ -31,7 +31,7 @@
 //! a single public signing key needed to consider it for verifying a claim.  This threshold
 //! can be one or higher.
 //! The claims_threshold specifies a minimal threshold on the number of verified claims before
-//! sentinel will attempt to merge these verified claims.
+//! pure sentinel will attempt to merge these verified claims.
 
 use super::{SerialisedClaim};
 
@@ -51,11 +51,11 @@ pub enum AddResult<Request, Name> where Request: Eq + PartialOrd + Ord + Clone +
     Resolved(Request, SerialisedClaim),
 }
 
-/// Sentinel is templated on an immutable Request type, a mergeable Claim type.
+/// PureSentinel is templated on an immutable Request type, a mergeable Claim type.
 /// It further takes a Name type to identify claimants.
 /// Signature and PublicSignKey type are auxiliary types to handle a user-chosen
 /// cryptographic signing scheme.
-pub struct Sentinel<Request, Name> where Request: Eq + PartialOrd + Ord + Clone + Source<Name>,
+pub struct PureSentinel<Request, Name> where Request: Eq + PartialOrd + Ord + Clone + Source<Name>,
                                          Name: Eq + PartialOrd + Ord + Clone {
     claim_accumulator: Accumulator<Request, (Name, Signature, SerialisedClaim)>,
     key_store: KeyStore<Name>,
@@ -63,18 +63,18 @@ pub struct Sentinel<Request, Name> where Request: Eq + PartialOrd + Ord + Clone 
 }
 
 impl<Request, Name>
-    Sentinel<Request, Name>
+    PureSentinel<Request, Name>
     where Request: Eq + PartialOrd + Ord + Clone + Source<Name>,
           Name: Eq + PartialOrd + Ord + Clone {
-    /// This creates a new sentinel that will collect a minimal claim_threshold number
+    /// This creates a new pure sentinel that will collect a minimal claim_threshold number
     /// of verified claims before attempting to merge these claims.
-    /// To obtain a verified claim Sentinel needs to have received a matching public
+    /// To obtain a verified claim PureSentinel needs to have received a matching public
     /// signing key. Each such a public signing key needs keys_threshold confirmations
     /// for it to be considered valid and used for verifying the signature
     /// of the corresponding claim.
     pub fn new(claim_threshold: usize, keys_threshold: usize)
-        -> Sentinel<Request, Name> {
-        Sentinel {
+        -> PureSentinel<Request, Name> {
+        PureSentinel {
             claim_accumulator: Accumulator::new(claim_threshold),
             key_store: KeyStore::new(keys_threshold),
             claim_threshold: claim_threshold,
@@ -116,7 +116,7 @@ impl<Request, Name>
     }
 
     /// This adds a new set of public_signing_keys for the provided request.
-    /// If the request is not known yet by sentinel, the added keys will be ignored.
+    /// If the request is not known yet by pure sentinel, the added keys will be ignored.
     /// When the added set of keys leads to the resolution of the request,
     /// the request and the verified and merged claim is returned.
     /// Otherwise None is returned.
@@ -250,7 +250,7 @@ mod test {
 #[test]
     fn one_request_and_one_key() {
         let mut name_key_pairs = Vec::new();
-        let mut sentinel: Sentinel<TestRequest, TestName> = Sentinel::new(1usize, 1usize);
+        let mut pure_sentinel: PureSentinel<TestRequest, TestName> = PureSentinel::new(1usize, 1usize);
         let name = generate_random_name();
         let request = TestRequest::new(random::<usize>(), name.clone());
         let claim = TestClaim { value : random::<usize>() };
@@ -261,7 +261,7 @@ mod test {
         name_key_pairs.push((climant_name.clone(), key_pair.0.clone()));
 
         // first claim added should return AddResult::RequestKeys
-        assert!(sentinel.add_claim(request.clone(), climant_name.clone(), signature.clone(), serialised_claim.clone())
+        assert!(pure_sentinel.add_claim(request.clone(), climant_name.clone(), signature.clone(), serialised_claim.clone())
             .and_then(|result| match result {
                 AddResult::RequestKeys(source_name) => { assert_eq!(request.get_source(), source_name);
                                                          Some(source_name)
@@ -270,7 +270,7 @@ mod test {
             }).is_some());
 
         // One key is required should pass
-        assert!(sentinel.add_keys(request.clone(), generate_random_name(), name_key_pairs.clone())
+        assert!(pure_sentinel.add_keys(request.clone(), generate_random_name(), name_key_pairs.clone())
             .and_then(|result| { assert_eq!(result.1, serialised_claim);
                                  assert_eq!(result.0, request);
                                  Some(result)
@@ -279,7 +279,7 @@ mod test {
 
 #[test]
     fn request_and_its_duplicate_added() {
-        let mut sentinel: Sentinel<TestRequest, TestName> = Sentinel::new(CLAIM_THRESHOLDS, KEY_THRESHOLDS);
+        let mut pure_sentinel: PureSentinel<TestRequest, TestName> = PureSentinel::new(CLAIM_THRESHOLDS, KEY_THRESHOLDS);
         let name = generate_random_name();
         let request = TestRequest::new(random::<usize>(), name.clone());
         let claim = TestClaim { value : random::<usize>() };
@@ -289,20 +289,20 @@ mod test {
         let climant_name = generate_random_name();
 
         // first claim added should return AddResult::RequestKeys
-        assert!(sentinel.add_claim(request.clone(), climant_name.clone(), signature.clone(), serialised_claim.clone())
+        assert!(pure_sentinel.add_claim(request.clone(), climant_name.clone(), signature.clone(), serialised_claim.clone())
             .and_then(|result| match result {
                 AddResult::RequestKeys(source_name) => { assert_eq!(request.get_source(), source_name); Some(source_name) },
                 AddResult::Resolved(_, _) => None
             }).is_some());
 
         // same claim added for the second time none to be returned
-        assert!(sentinel.add_claim(request, climant_name, signature, serialised_claim).is_none())
+        assert!(pure_sentinel.add_claim(request, climant_name, signature, serialised_claim).is_none())
     }
 
 #[test]
     fn threshold_claims_requests_added_with_no_keys() {
         let mut name_key_pairs = Vec::new();
-        let mut sentinel: Sentinel<TestRequest, TestName> = Sentinel::new(CLAIM_THRESHOLDS, KEY_THRESHOLDS);
+        let mut pure_sentinel: PureSentinel<TestRequest, TestName> = PureSentinel::new(CLAIM_THRESHOLDS, KEY_THRESHOLDS);
         let name = generate_random_name();
         let request = TestRequest::new(random::<usize>(), name.clone());
         let claim = TestClaim { value : random::<usize>() };
@@ -312,7 +312,7 @@ mod test {
             let signature = crypto::sign::sign_detached(&serialised_claim, &key_pair.1);
             let climant_name = generate_random_name();
             name_key_pairs.push((climant_name.clone(), key_pair.0.clone()));
-            assert!(sentinel.add_claim(request.clone(), climant_name, signature.clone(), serialised_claim.clone())
+            assert!(pure_sentinel.add_claim(request.clone(), climant_name, signature.clone(), serialised_claim.clone())
                 .map_or(true, |result| match result {
                     AddResult::RequestKeys(source_name) => { assert_eq!(request.get_source(), source_name);
                                                              assert_eq!(index, 0usize);
@@ -326,7 +326,7 @@ mod test {
 #[test]
     fn requests_added_with_various_key_size() {
         let mut name_key_pairs = Vec::new();
-        let mut sentinel: Sentinel<TestRequest, TestName> = Sentinel::new(CLAIM_THRESHOLDS, KEY_THRESHOLDS);
+        let mut pure_sentinel: PureSentinel<TestRequest, TestName> = PureSentinel::new(CLAIM_THRESHOLDS, KEY_THRESHOLDS);
         let name = generate_random_name();
         let request = TestRequest::new(random::<usize>(), name.clone());
         let claim = TestClaim { value : random::<usize>() };
@@ -336,7 +336,7 @@ mod test {
             let signature = crypto::sign::sign_detached(&serialised_claim, &key_pair.1);
             let climant_name = generate_random_name();
             name_key_pairs.push((climant_name.clone(), key_pair.0.clone()));
-            assert!(sentinel.add_claim(request.clone(), climant_name, signature.clone(), serialised_claim.clone())
+            assert!(pure_sentinel.add_claim(request.clone(), climant_name, signature.clone(), serialised_claim.clone())
                 .map_or(true, |result| match result {
                     AddResult::RequestKeys(source_name) => { assert_eq!(request.get_source(), source_name);
                                                              assert_eq!(index, 0usize);
@@ -348,17 +348,17 @@ mod test {
 
         // less than KEY_THRESHOLDS kyes received, should return None as the vector has the senders
         for index in 0..KEY_THRESHOLDS {
-            assert!(sentinel.add_keys(request.clone(), name_key_pairs[index].0.clone(), name_key_pairs.clone()).is_none());
+            assert!(pure_sentinel.add_keys(request.clone(), name_key_pairs[index].0.clone(), name_key_pairs.clone()).is_none());
         }
 
         // KEY_THRESHOLDS kyes received, should not return none
-        assert!(sentinel.add_keys(request.clone(), generate_random_name(), name_key_pairs.clone())
+        assert!(pure_sentinel.add_keys(request.clone(), generate_random_name(), name_key_pairs.clone())
             .and_then(|result| { assert_eq!(result.1, serialised_claim);
                                  assert_eq!(result.0, request);
                                  Some(result)
             }).is_some());
 
         // more than KEY_THRESHOLDS kyes received, should return None
-        assert!(sentinel.add_keys(request, generate_random_name(), name_key_pairs).is_none());
+        assert!(pure_sentinel.add_keys(request, generate_random_name(), name_key_pairs).is_none());
     }
 }
