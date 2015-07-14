@@ -127,8 +127,7 @@ impl<Request, Name, IdType, GroupClaim> KeySentinel<Request, Name, IdType, Group
                     key_store: &mut KeyStore<Name>,
                     serialised: &SerialisedClaim,
                     signature: &sign::Signature) -> bool {
-        for public_key in key_store.get_accumulated_keys(&author) {
-            
+        for public_key in key_store.get_accumulated_keys(&author, None) {
             if verify_signature(signature, &public_key, serialised).is_some() {
                 return true;
             }

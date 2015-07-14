@@ -59,7 +59,6 @@ pub struct PureSentinel<Request, Name> where Request: Eq + PartialOrd + Ord + Cl
                                          Name: Eq + PartialOrd + Ord + Clone {
     claim_accumulator: Accumulator<Request, (Name, Signature, SerialisedClaim)>,
     key_store: KeyStore<Name>,
-    claim_threshold: usize,
 }
 
 impl<Request, Name>
@@ -72,12 +71,11 @@ impl<Request, Name>
     /// signing key. Each such a public signing key needs keys_threshold confirmations
     /// for it to be considered valid and used for verifying the signature
     /// of the corresponding claim.
-    pub fn new(claim_threshold: usize, keys_threshold: usize)
+    pub fn new()
         -> PureSentinel<Request, Name> {
         PureSentinel {
-            claim_accumulator: Accumulator::new(claim_threshold),
-            key_store: KeyStore::new(keys_threshold),
-            claim_threshold: claim_threshold,
+            claim_accumulator: Accumulator::new(1usize),
+            key_store: KeyStore::new(1usize),
         }
     }
 
@@ -97,13 +95,17 @@ impl<Request, Name>
                      request   : Request,
                      claimant  : Name,            // Node which sent the message
                      signature : Signature,
-                     claim     : SerialisedClaim) -> Option<AddResult<Request, Name>> {
+                     claim     : SerialisedClaim,
+                     claims_quorom_size: usize,
+                     keys_quorom_size: usize) -> Option<AddResult<Request, Name>> {
 
         let saw_first_time = !self.claim_accumulator.contains_key(&request);
+        self.claim_accumulator.set_quorum_size(claims_quorom_size);
 
         self.claim_accumulator
             .add(request.clone(), (claimant, signature, claim))
-            .and_then(|(request, claims)| self.resolve(request, claims))
+            .and_then(|(request, claims)| self.resolve(request, claims, claims_quorom_size,
+                                                       keys_quorom_size))
             .map(|(request, serialised_claim)| {
                 AddResult::Resolved(request, serialised_claim)
             }).or_else(|| {
@@ -120,7 +122,8 @@ impl<Request, Name>
     /// When the added set of keys leads to the resolution of the request,
     /// the request and the verified and merged claim is returned.
     /// Otherwise None is returned.
-    pub fn add_keys(&mut self, request : Request, sender: Name, keys : Vec<(Name, PublicKey)>)
+    pub fn add_keys(&mut self, request : Request, sender: Name, keys : Vec<(Name, PublicKey)>,
+                    claims_quorom_size: usize, keys_quorom_size: usize)
         -> Option<(Request, SerialisedClaim)> {
         // We don't want to store keys for requests we haven't received yet because
         // we couldn't have requested those keys. So someone is probably trying
@@ -134,21 +137,22 @@ impl<Request, Name>
         }
 
         self.claim_accumulator.get(&request)
-            .and_then(|(request, claims)| { self.resolve(request, claims) })
+            .and_then(|(request, claims)| { self.resolve(request, claims, claims_quorom_size,
+                                                         keys_quorom_size) })
     }
 
     /// Verify is only concerned with checking the signatures of the serialised claims.
     /// To achieve this it pairs up a set of signed claims and a set of public signing keys.
-    fn verify(&mut self, claims : &Vec<(Name, Signature, SerialisedClaim)>)
-        -> Vec<SerialisedClaim> {
+    fn verify(&mut self, claims : &Vec<(Name, Signature, SerialisedClaim)>,
+              key_quorum_size: usize) -> Vec<SerialisedClaim> {
         claims.iter().filter_map(|&(ref name, ref signature, ref body)| {
-                self.verify_single_claim(name, signature, body)
+                self.verify_single_claim(name, signature, body, key_quorum_size)
             }).collect()
     }
 
-    fn verify_single_claim(&mut self, name: &Name, signature: &Signature, body: &SerialisedClaim)
-        -> Option<SerialisedClaim> {
-        for public_key in self.key_store.get_accumulated_keys(&name) {
+    fn verify_single_claim(&mut self, name: &Name, signature: &Signature, body: &SerialisedClaim,
+                           key_quorum_size: usize) -> Option<SerialisedClaim> {
+        for public_key in self.key_store.get_accumulated_keys(&name, Some(key_quorum_size)) {
             match super::verify_signature(&signature, &public_key, &body) {
                 Some(body) => return Some(body),
                 None => continue
@@ -157,8 +161,9 @@ impl<Request, Name>
         None
     }
 
-    fn squash(&self, verified_claims : Vec<SerialisedClaim>) -> Option<SerialisedClaim> {
-        if verified_claims.len() < self.claim_threshold {
+    fn squash(&self, verified_claims : Vec<SerialisedClaim>, claims_quorom_size: usize)
+        -> Option<SerialisedClaim> {
+        if verified_claims.len() < claims_quorom_size {
             // Can't squash: not enough claims.
             return None;
         }
@@ -170,7 +175,7 @@ impl<Request, Name>
         }
 
         let mut iter = frequency.sort_by_highest().into_iter()
-            .filter(|&(_, ref count)| *count >= self.claim_threshold)
+            .filter(|&(_, ref count)| *count >= claims_quorom_size)
             .map(|(resolved_claim, _)| resolved_claim);
 
         let retval = iter.next().map(|a| a.clone());
@@ -182,10 +187,11 @@ impl<Request, Name>
         retval
     }
 
-    fn resolve(&mut self, request: Request, claims: Vec<(Name, Signature, SerialisedClaim)>)
+    fn resolve(&mut self, request: Request, claims: Vec<(Name, Signature, SerialisedClaim)>,
+               claims_quorom_size: usize, keys_quorum_size: usize)
         -> Option<(Request, SerialisedClaim)> {
-        let verified_claims = self.verify(&claims);
-        self.squash(verified_claims)
+        let verified_claims = self.verify(&claims, keys_quorum_size);
+        self.squash(verified_claims, claims_quorom_size)
             .map(|c| {
                 self.claim_accumulator.delete(&request);
                 (request, c)
