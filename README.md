@@ -21,4 +21,3 @@ Confirm group based consensus on messages in a p2p network
 - [ ] [MAID-1153](https://maidsafe.atlassian.net/browse/MAID-1153) MAID-1152 Modify PureSentinel to use dynamic threshold values
 - [ ] [MAID-1155](https://maidsafe.atlassian.net/browse/MAID-1155) MAID-1152 Modify KeySentinel to use dynamic threshold values
 - [ ] [MAID-1184](https://maidsafe.atlassian.net/browse/MAID-1184) MAID-1152 Replace the AccountSentinel with the accumulator we have in Routing
-

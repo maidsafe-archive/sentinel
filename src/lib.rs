@@ -50,7 +50,7 @@ pub type SerialisedClaim = Vec<u8>;
 
 /// Sentinel provides a consensus mechanism on all content messages.
 /// The claims made must be identical and cryptographically signed.
-pub mod sentinel;
+pub mod pure_sentinel;
 mod key_store;
 mod key_sentinel;
 mod wrappers;
