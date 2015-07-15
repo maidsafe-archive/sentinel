@@ -61,7 +61,8 @@ impl<Name> KeyStore<Name> where Name: Eq + PartialOrd + Ord + Clone {
 
     /// Returns a vector of keys belonging to `target`, for whom we've received the key
     /// from at least a quorum size of unique senders.
-    pub fn get_accumulated_keys(&mut self, target: &Name, quorum_size: Option<usize>) -> Vec<sign::PublicKey> {
+    pub fn get_accumulated_keys(&mut self, target: &Name,
+                                quorum_size: Option<usize>) -> Vec<sign::PublicKey> {
         // Create temp variable to workaround a borrow checker bug
         // http://blog.ezyang.com/2013/12/two-bugs-in-the-borrow-checker-every-rust-developer-should-know-about/
         let size = quorum_size.unwrap_or(self.quorum_size);

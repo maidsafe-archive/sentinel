@@ -140,16 +140,16 @@ impl<Request, Name>
 
     /// Verify is only concerned with checking the signatures of the serialised claims.
     /// To achieve this it pairs up a set of signed claims and a set of public signing keys.
-    fn verify(&mut self, claims : &Vec<(Name, Signature, SerialisedClaim)>,
-              key_quorum_size: usize) -> Vec<SerialisedClaim> {
+    fn verify(&mut self, claims : &Vec<(Name, Signature, SerialisedClaim)>, quorum_size: usize)
+        -> Vec<SerialisedClaim> {
         claims.iter().filter_map(|&(ref name, ref signature, ref body)| {
-                self.verify_single_claim(name, signature, body, key_quorum_size)
+                self.verify_single_claim(name, signature, body, quorum_size)
             }).collect()
     }
 
     fn verify_single_claim(&mut self, name: &Name, signature: &Signature, body: &SerialisedClaim,
-                           key_quorum_size: usize) -> Option<SerialisedClaim> {
-        for public_key in self.key_store.get_accumulated_keys(&name, Some(key_quorum_size)) {
+                           quorum_size: usize) -> Option<SerialisedClaim> {
+        for public_key in self.key_store.get_accumulated_keys(&name, Some(quorum_size)) {
             match super::verify_signature(&signature, &public_key, &body) {
                 Some(body) => return Some(body),
                 None => continue
