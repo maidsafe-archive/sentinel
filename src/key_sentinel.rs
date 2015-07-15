@@ -46,8 +46,6 @@ pub struct KeySentinel<Request, Name, IdType, GroupClaim>
               IdType:  Eq + PartialOrd + Ord + Clone + IdTrait<Name>,
               GroupClaim:  Eq + PartialOrd + Ord + Clone + GroupClaimTrait<IdType>, {
     cache: LruCache<Request, (KeyStore<Name>, Map<Name, Set<(GroupClaim, SerialisedClaim, SignW)>>)>,
-    claim_threshold: usize,
-    keys_threshold: usize,
     phantom: PhantomData<IdType>,
 }
 
@@ -58,30 +56,27 @@ impl<Request, Name, IdType, GroupClaim> KeySentinel<Request, Name, IdType, Group
           GroupClaim: Eq + PartialOrd + Ord + Clone + GroupClaimTrait<IdType>, {
 
     #[allow(dead_code)]
-    pub fn new(claim_threshold: usize, keys_threshold: usize)
-            -> KeySentinel<Request, Name, IdType, GroupClaim> {
+    pub fn new() -> KeySentinel<Request, Name, IdType, GroupClaim> {
         KeySentinel {
             cache: LruCache::with_capacity(MAX_REQUEST_COUNT),
-            claim_threshold: claim_threshold,
-            keys_threshold: keys_threshold,
             phantom: PhantomData,
         }
     }
 
     #[allow(dead_code)]
     pub fn add_identities(&mut self,
-                          request:    Request,
-                          sender:     Name,
-                          serialised: SerialisedClaim,
-                          signature:  sign::Signature,
-                          claim:      GroupClaim)
+                          request:     Request,
+                          sender:      Name,
+                          serialised:  SerialisedClaim,
+                          signature:   sign::Signature,
+                          claim:       GroupClaim,
+                          quorum_size: usize)
         -> Option<(Request, Vec<IdType>)> {
 
         let retval = {
-            let keys_threshold = self.keys_threshold;
             let keys_and_claims
                 = self.cache.entry(request.clone())
-                            .or_insert_with(||(KeyStore::new(keys_threshold), Map::new()));
+                            .or_insert_with(||(KeyStore::new(), Map::new()));
 
             let ref mut keys   = &mut keys_and_claims.0;
             let ref mut claims = &mut keys_and_claims.1;
@@ -93,7 +88,7 @@ impl<Request, Name, IdType, GroupClaim> KeySentinel<Request, Name, IdType, Group
             claims.entry(sender).or_insert_with(||Set::new())
                 .insert((claim, serialised, SignW(signature)));
 
-            Self::try_selecting_group(keys, claims, self.claim_threshold)
+            Self::try_selecting_group(keys, claims, quorum_size)
                 .map(|ids|(request, ids))
         };
 
@@ -105,18 +100,18 @@ impl<Request, Name, IdType, GroupClaim> KeySentinel<Request, Name, IdType, Group
 
     fn try_selecting_group(key_store: &mut KeyStore<Name>,
                            claims: &Map<Name, Set<(GroupClaim, SerialisedClaim, SignW)>>,
-                           claim_threshold: usize) -> Option<Vec<IdType>> {
+                           quorum_size: usize) -> Option<Vec<IdType>> {
 
         let verified_claims = claims.iter().filter_map(|(name, claims)| {
             for &(ref claim, ref serialised, ref signature) in claims {
-                if Self::verify_claim(name, key_store, serialised, &(signature.0)) {
+                if Self::verify_claim(name, key_store, serialised, &(signature.0), quorum_size) {
                     return Some(claim);
                 }
             }
             None
         }).collect::<Vec<_>>();
 
-        if verified_claims.len() < claim_threshold {
+        if verified_claims.len() < quorum_size {
             return None;
         }
 
@@ -126,8 +121,9 @@ impl<Request, Name, IdType, GroupClaim> KeySentinel<Request, Name, IdType, Group
     fn verify_claim(author: &Name,
                     key_store: &mut KeyStore<Name>,
                     serialised: &SerialisedClaim,
-                    signature: &sign::Signature) -> bool {
-        for public_key in key_store.get_accumulated_keys(&author, None) {
+                    signature: &sign::Signature,
+                    quorum_size: usize) -> bool {
+        for public_key in key_store.get_accumulated_keys(&author, quorum_size) {
             if verify_signature(signature, &public_key, serialised).is_some() {
                 return true;
             }
@@ -143,8 +139,7 @@ mod test {
     use sodiumoxide::crypto::sign;
 
     const MESSAGE_SIZE: usize = 4;
-    const CLAIMS_THRESHOLD: usize = 10;
-    const KEYS_THRESHOLD: usize = 10;
+    const QUORUM: usize = 10;
 
     #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
     pub struct TestName(pub u32);
@@ -201,14 +196,14 @@ mod test {
     #[test]
     fn key_sentinel() {
         let mut sentinel: KeySentinel<TestRequest, TestName, TestIdType, TestGroupClaim>
-            = KeySentinel::new(CLAIMS_THRESHOLD, KEYS_THRESHOLD);
+            = KeySentinel::new();
 
         let random_message = generate_random_message();
         let mut names      = Vec::new();
         let mut pubs       = Vec::new();
         let mut signatures = Vec::new();
 
-        for i in 0..KEYS_THRESHOLD + 1 {
+        for i in 0..QUORUM + 1 {
             let key_pair = sign::gen_keypair();
 
             names.push(TestName(i as u32));
@@ -216,7 +211,7 @@ mod test {
             signatures.push(sign::sign_detached(&random_message, &key_pair.1));
         }
 
-        let request = TestRequest::new(random::<usize>(), TestName((KEYS_THRESHOLD + 1) as u32));
+        let request = TestRequest::new(random::<usize>(), TestName((QUORUM + 1) as u32));
 
         let name_pubs = names.iter().zip(pubs.iter())
                              .map(|(ref name, ref public_key)|
@@ -224,23 +219,25 @@ mod test {
                                                    public_key: public_key.clone().0 })
                              .collect::<Vec<_>>();
 
-        for index in 0..KEYS_THRESHOLD + 1 {
+        for index in 0..QUORUM + 1 {
             let group_claim = TestGroupClaim::new(name_pubs.clone());
 
-            if index < KEYS_THRESHOLD {
+            if index < QUORUM {
                 assert!(sentinel.add_identities(request.clone(),
                                                 names[index].clone(),
                                                 random_message.clone(),
                                                 signatures[index].clone(),
-                                                group_claim).is_none());
+                                                group_claim,
+                                                QUORUM).is_none());
                 continue;
             }
 
             assert!(sentinel.add_identities(request.clone(),
-                                            names[KEYS_THRESHOLD].clone(),
+                                            names[QUORUM].clone(),
                                             random_message.clone(),
-                                            signatures[KEYS_THRESHOLD].clone(),
-                                            group_claim).is_some());
+                                            signatures[QUORUM].clone(),
+                                            group_claim,
+                                            QUORUM).is_some());
         }
     }
 }

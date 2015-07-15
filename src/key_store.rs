@@ -31,17 +31,14 @@ type Set<A>    = BTreeSet<A>;
 
 #[derive(Clone)]
 pub struct KeyStore<Name> where Name: Eq + PartialOrd + Ord + Clone {
-    quorum_size: usize,
     //              +--- Target            +--- Sender
     //              V                      V
     cache: LruCache<Name, Map<KeyData, Set<Name>>>,
 }
 
 impl<Name> KeyStore<Name> where Name: Eq + PartialOrd + Ord + Clone {
-    pub fn new(quorum_size: usize) -> KeyStore<Name> {
-        KeyStore{ quorum_size: quorum_size
-                , cache: LruCache::with_capacity(NAME_CAPACITY)
-        }
+    pub fn new() -> KeyStore<Name> {
+        KeyStore{ cache: LruCache::with_capacity(NAME_CAPACITY) }
     }
 
     pub fn add_key(&mut self, target: Name, sender: Name, key: sign::PublicKey) {
@@ -61,13 +58,12 @@ impl<Name> KeyStore<Name> where Name: Eq + PartialOrd + Ord + Clone {
 
     /// Returns a vector of keys belonging to `target`, for whom we've received the key
     /// from at least a quorum size of unique senders.
-    pub fn get_accumulated_keys(&mut self, target: &Name,
-                                quorum_size: Option<usize>) -> Vec<sign::PublicKey> {
+    pub fn get_accumulated_keys(&mut self, target: &Name, quorum_size: usize)
+        -> Vec<sign::PublicKey> {
         // Create temp variable to workaround a borrow checker bug
         // http://blog.ezyang.com/2013/12/two-bugs-in-the-borrow-checker-every-rust-developer-should-know-about/
-        let size = quorum_size.unwrap_or(self.quorum_size);
         self.cache.get(target)
-            .iter().flat_map(|keys| Self::pick_where_quorum_reached(keys, size))
+            .iter().flat_map(|keys| Self::pick_where_quorum_reached(keys, quorum_size))
             .cloned().map(sign::PublicKey)
             .collect::<_>()
     }
@@ -104,7 +100,7 @@ mod test {
     #[test]
     fn quorum_reached() {
         let target : NameType = 0;
-        let mut ks = KeyStore::<NameType>::new(QUORUM);
+        let mut ks = KeyStore::<NameType>::new();
         let valid_key = random_key();
 
         add_noise(&mut ks, target, 1000);
@@ -113,9 +109,9 @@ mod test {
             ks.add_key(target, i as NameType, valid_key);
 
             if i < QUORUM {
-                assert!(ks.get_accumulated_keys(&target, None).is_empty());
+                assert!(ks.get_accumulated_keys(&target, QUORUM).is_empty());
             } else {
-                assert!(!ks.get_accumulated_keys(&target, None).is_empty());
+                assert!(!ks.get_accumulated_keys(&target, QUORUM).is_empty());
             }
         }
     }
@@ -123,7 +119,7 @@ mod test {
     #[test]
     fn no_self_sign() {
         let target : NameType = 0;
-        let mut ks = KeyStore::<NameType>::new(QUORUM);
+        let mut ks = KeyStore::<NameType>::new();
         let valid_key = random_key();
 
         add_noise(&mut ks, target, 1000);
@@ -131,14 +127,14 @@ mod test {
         // Node zero sends signature for zero, that shouldn't be valid.
         for i in (0..QUORUM) {
             ks.add_key(target, i as NameType, valid_key);
-            assert!(ks.get_accumulated_keys(&target, None).is_empty());
+            assert!(ks.get_accumulated_keys(&target, QUORUM).is_empty());
         }
     }
 
     #[test]
     fn successful_attack() {
         let target : NameType = 0;
-        let mut ks = KeyStore::<NameType>::new(QUORUM);
+        let mut ks = KeyStore::<NameType>::new();
         let valid_key1 = random_key();
         let valid_key2 = random_key();
 
@@ -148,9 +144,9 @@ mod test {
             ks.add_key(target, i as NameType, valid_key1);
 
             if i < QUORUM {
-                assert!(ks.get_accumulated_keys(&target, None).len() == 0);
+                assert!(ks.get_accumulated_keys(&target, QUORUM).len() == 0);
             } else {
-                assert!(ks.get_accumulated_keys(&target, None).len() == 1);
+                assert!(ks.get_accumulated_keys(&target, QUORUM).len() == 1);
             }
         }
 
@@ -158,9 +154,9 @@ mod test {
             ks.add_key(target, i as NameType, valid_key2);
 
             if i < QUORUM {
-                assert!(ks.get_accumulated_keys(&target, None).len() == 1);
+                assert!(ks.get_accumulated_keys(&target, QUORUM).len() == 1);
             } else {
-                assert!(ks.get_accumulated_keys(&target, None).len() == 2);
+                assert!(ks.get_accumulated_keys(&target, QUORUM).len() == 2);
             }
         }
     }
