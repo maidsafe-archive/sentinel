@@ -12,7 +12,7 @@ homepage = "http://maidsafe.net"
 [dependencies]
 rustc-serialize = "*"
 cbor = "*"
-maidsafe_sodiumoxide = "*"
+sodiumoxide = "*"
 rand = "*"
 accumulator = "0.0.*"
 lru_time_cache = "0.1.*"
