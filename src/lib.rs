@@ -52,7 +52,7 @@ pub type SerialisedClaim = Vec<u8>;
 /// The claims made must be identical and cryptographically signed.
 pub mod pure_sentinel;
 mod key_store;
-mod key_sentinel;
+pub mod key_sentinel;
 mod wrappers;
 mod refresh_sentinel;
 mod statistics;
