@@ -5,9 +5,9 @@
 
 **Secondary Maintainer:**   Benjamin Bollen (benjamin.bollen@maidsafe.net)
 
-|Crate|Linux/OS X|Windows|Appveyor|Coverage|Issues|
+|Crate|Linux/OS X|Appveyor|Coverage|Issues|
 |:---:|:--------:|:-----:|:------:|:------:|:----:|
-|[![](http://meritbadge.herokuapp.com/sentinel)](https://crates.io/crates/sentinel)|[![Build Status](https://travis-ci.org/maidsafe/sentinel.svg?branch=master)](https://travis-ci.org/maidsafe/sentinel)|[![Build Status](http://ci.maidsafe.net:8080/buildStatus/icon?job=sentinel_win64_status_badge)](http://ci.maidsafe.net:8080/job/sentinel_win64_status_badge/)|[![Build status](https://ci.appveyor.com/api/projects/status/8k0rwy0miac09p1b/branch/master?svg=true)](https://ci.appveyor.com/project/MaidSafe-QA/sentinel/branch/master)|[![Coverage Status](https://coveralls.io/repos/maidsafe/sentinel/badge.svg)](https://coveralls.io/r/maidsafe/sentinel)|[![Stories in Ready](https://badge.waffle.io/maidsafe/sentinel.png?label=ready&title=Ready)](https://waffle.io/maidsafe/sentinel)|
+|[![](http://meritbadge.herokuapp.com/sentinel)](https://crates.io/crates/sentinel)|[![Build Status](https://travis-ci.org/maidsafe/sentinel.svg?branch=master)](https://travis-ci.org/maidsafe/sentinel)|[![Build status](https://ci.appveyor.com/api/projects/status/8k0rwy0miac09p1b/branch/master?svg=true)](https://ci.appveyor.com/project/MaidSafe-QA/sentinel/branch/master)|[![Coverage Status](https://coveralls.io/repos/maidsafe/sentinel/badge.svg)](https://coveralls.io/r/maidsafe/sentinel)|[![Stories in Ready](https://badge.waffle.io/maidsafe/sentinel.png?label=ready&title=Ready)](https://waffle.io/maidsafe/sentinel)|
 
 | [API Documentation - master branch](http://maidsafe.net/sentinel/master) | [SAFE Network System Documention](http://systemdocs.maidsafe.net) | [MaidSafe website](http://maidsafe.net) | [Safe Community site](https://forum.safenetwork.io) |
 |:------:|:-------:|:-------:|:-------:|
