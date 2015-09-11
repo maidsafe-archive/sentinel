@@ -16,18 +16,16 @@
 // relating to use of the SAFE Network Software.
 
 pub struct Frequency<Key: PartialEq + Eq + Clone> {
-    map: Vec<(Key, usize)>
+    map: Vec<(Key, usize)>,
 }
 
 impl<Key: PartialEq + Eq + Clone> Frequency<Key> {
     pub fn new() -> Frequency<Key> {
-        Frequency {
-            map: Vec::<(Key, usize)>::new()
-        }
+        Frequency { map: Vec::<(Key, usize)>::new() }
     }
 
     pub fn update(&mut self, key: &Key) {
-        let mut fresh_key : bool = true;
+        let mut fresh_key: bool = true;
         for stored_key in self.map.iter_mut() {
             if &stored_key.0 == key {
                 stored_key.1 += 1;
@@ -49,7 +47,7 @@ impl<Key: PartialEq + Eq + Clone> Frequency<Key> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use rand::{thread_rng, Rng};
+    use rand::{Rng, thread_rng};
 
     #[test]
     fn fill_monotonic_distribution() {
@@ -59,16 +57,20 @@ mod test {
         let domain_low = 0u32;
         let domain_high = 500u32;
         assert!(domain_low < domain_high);
-        let mut all_counts : Vec<u32> = Vec::with_capacity(3000); // simple approx upperbound
+        let mut all_counts: Vec<u32> = Vec::with_capacity(3000); // simple approx upperbound
         for _ in 0..100 {
-            let x : u32 = rng.gen_range(domain_low, domain_high);
-            if all_counts.contains(&x) { continue; } // avoid double counting
-            let fx : f64 = x.clone() as f64;
+            let x: u32 = rng.gen_range(domain_low, domain_high);
+            if all_counts.contains(&x) {
+                continue;
+            } // avoid double counting
+            let fx: f64 = x.clone() as f64;
             // use monotonic descending range of gaussian
-            let y : f64 = 30f64 * (- (fx.powi(2i32) / 100000f64)).exp();
-            let count : usize = y.trunc() as usize + 1;
+            let y: f64 = 30f64 * (- (fx.powi(2i32) / 100000f64)).exp();
+            let count: usize = y.trunc() as usize + 1;
             // duplicate the keys for
-            for _ in 0usize..count { all_counts.push(x.clone()); };
+            for _ in 0usize..count {
+                all_counts.push(x.clone());
+            };
         };
 
         // shuffle duplicated keys
@@ -82,9 +84,9 @@ mod test {
         let ordered_counts = freq.sort_by_highest();
         let mut max_count = 31usize;
         for value in ordered_counts {
-            let fx : f64 = value.0.clone() as f64;
-            let y : f64 = 30f64 * (- (fx.powi(2i32) / 100000f64)).exp();
-            let count : usize = y.trunc() as usize + 1;
+            let fx: f64 = value.0.clone() as f64;
+            let y: f64 = 30f64 * (- (fx.powi(2i32) / 100000f64)).exp();
+            let count: usize = y.trunc() as usize + 1;
             // because we started with random keys whos occurance monotonically decreased
             // for increasing key, the keys should now increase, as the count decreases.
             assert_eq!(value.1, count);

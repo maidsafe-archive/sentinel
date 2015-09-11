@@ -17,11 +17,11 @@
 
 use lru_time_cache::LruCache;
 use sodiumoxide::crypto::sign;
-use std::collections::{BTreeSet, BTreeMap};
+use std::collections::{BTreeMap, BTreeSet};
 use key_store::KeyStore;
 use std::marker::PhantomData;
 use std::fmt::Debug;
-use super::{verify_signature, SerialisedClaim};
+use super::{SerialisedClaim, verify_signature};
 use wrappers::SignW;
 
 #[allow(dead_code)]
@@ -41,10 +41,11 @@ pub trait GroupClaimTrait<IdTrait> {
 
 #[allow(dead_code)]
 pub struct KeySentinel<Request, Name, IdType, GroupClaim>
-        where Request: Eq + PartialOrd + Ord + Clone,
-              Name:    Eq + PartialOrd + Ord + Clone + Debug,
-              IdType:  Eq + PartialOrd + Ord + Clone + IdTrait<Name>,
-              GroupClaim:  Eq + PartialOrd + Ord + Clone + GroupClaimTrait<IdType>, {
+    where Request: Eq + PartialOrd + Ord + Clone,
+          Name: Eq + PartialOrd + Ord + Clone + Debug,
+          IdType: Eq + PartialOrd + Ord + Clone + IdTrait<Name>,
+          GroupClaim: Eq + PartialOrd + Ord + Clone + GroupClaimTrait<IdType>
+{
     cache: LruCache<Request, (KeyStore<Name>, Map<Name, Set<(GroupClaim, SerialisedClaim, SignW)>>)>,
     phantom: PhantomData<IdType>,
 }
@@ -57,28 +58,24 @@ impl<Request, Name, IdType, GroupClaim> KeySentinel<Request, Name, IdType, Group
 
     #[allow(dead_code)]
     pub fn new() -> KeySentinel<Request, Name, IdType, GroupClaim> {
-        KeySentinel {
-            cache: LruCache::with_capacity(MAX_REQUEST_COUNT),
-            phantom: PhantomData,
-        }
+        KeySentinel { cache: LruCache::with_capacity(MAX_REQUEST_COUNT), phantom: PhantomData }
     }
 
     #[allow(dead_code)]
     pub fn add_identities(&mut self,
-                          request:     Request,
-                          sender:      Name,
-                          serialised:  SerialisedClaim,
-                          signature:   sign::Signature,
-                          claim:       GroupClaim,
+                          request: Request,
+                          sender: Name,
+                          serialised: SerialisedClaim,
+                          signature: sign::Signature,
+                          claim: GroupClaim,
                           quorum_size: usize)
-        -> Option<(Request, Vec<IdType>)> {
+                          -> Option<(Request, Vec<IdType>)> {
 
         let retval = {
-            let keys_and_claims
-                = self.cache.entry(request.clone())
+            let keys_and_claims = self.cache.entry(request.clone())
                             .or_insert_with(||(KeyStore::new(), Map::new()));
 
-            let ref mut keys   = &mut keys_and_claims.0;
+            let ref mut keys = &mut keys_and_claims.0;
             let ref mut claims = &mut keys_and_claims.1;
 
             for id in claim.group_identities() {
@@ -100,7 +97,8 @@ impl<Request, Name, IdType, GroupClaim> KeySentinel<Request, Name, IdType, Group
 
     fn try_selecting_group(key_store: &mut KeyStore<Name>,
                            claims: &Map<Name, Set<(GroupClaim, SerialisedClaim, SignW)>>,
-                           quorum_size: usize) -> Option<Vec<IdType>> {
+                           quorum_size: usize)
+                           -> Option<Vec<IdType>> {
 
         let verified_claims = claims.iter().filter_map(|(name, claims)| {
             for &(ref claim, ref serialised, ref signature) in claims {
@@ -122,7 +120,8 @@ impl<Request, Name, IdType, GroupClaim> KeySentinel<Request, Name, IdType, Group
                     key_store: &mut KeyStore<Name>,
                     serialised: &SerialisedClaim,
                     signature: &sign::Signature,
-                    quorum_size: usize) -> bool {
+                    quorum_size: usize)
+                    -> bool {
         for public_key in key_store.get_accumulated_keys(&author, quorum_size) {
             if verify_signature(signature, &public_key, serialised).is_some() {
                 return true;
@@ -146,30 +145,32 @@ mod test {
 
     fn generate_random_message() -> Vec<u8> {
         let mut arr = [0u8;MESSAGE_SIZE];
-        for i in (0..MESSAGE_SIZE) { arr[i] = random::<u8>(); }
+        for i in (0..MESSAGE_SIZE) {
+            arr[i] = random::<u8>();
+        }
         arr.to_vec()
     }
 
     #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
     struct TestRequest {
-        core : usize,
-        name : TestName
+        core: usize,
+        name: TestName,
     }
 
     impl TestRequest {
         pub fn new(core: usize, name: TestName) -> TestRequest {
-            TestRequest { core : core, name : name }
+            TestRequest { core: core, name: name }
         }
     }
 
     #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
     struct TestIdType {
         name: TestName,
-        public_key: [u8;sign::PUBLICKEYBYTES],
+        public_key: [u8; sign::PUBLICKEYBYTES],
     }
 
     impl IdTrait<TestName> for TestIdType {
-        fn name(&self) -> TestName  {
+        fn name(&self) -> TestName {
             self.name.clone()
         }
 
@@ -179,7 +180,9 @@ mod test {
     }
 
     #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
-    struct TestGroupClaim { identities: Vec<TestIdType>, }
+    struct TestGroupClaim {
+        identities: Vec<TestIdType>,
+    }
 
     impl TestGroupClaim {
         pub fn new(identities: Vec<TestIdType>) -> TestGroupClaim {
@@ -195,12 +198,12 @@ mod test {
 
     #[test]
     fn key_sentinel() {
-        let mut sentinel: KeySentinel<TestRequest, TestName, TestIdType, TestGroupClaim>
-            = KeySentinel::new();
+        let mut sentinel: KeySentinel<TestRequest, TestName, TestIdType, TestGroupClaim> =
+            KeySentinel::new();
 
         let random_message = generate_random_message();
-        let mut names      = Vec::new();
-        let mut pubs       = Vec::new();
+        let mut names = Vec::new();
+        let mut pubs = Vec::new();
         let mut signatures = Vec::new();
 
         for i in 0..QUORUM + 1 {

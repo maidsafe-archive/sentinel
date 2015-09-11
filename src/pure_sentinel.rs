@@ -33,7 +33,7 @@
 //! The claims_threshold specifies a minimal threshold on the number of verified claims before
 //! pure sentinel will attempt to merge these verified claims.
 
-use super::{SerialisedClaim};
+use super::SerialisedClaim;
 
 use sodiumoxide::crypto::sign::PublicKey;
 use sodiumoxide::crypto::sign::Signature;
@@ -45,8 +45,10 @@ pub trait Source<Name> where Name: Eq + PartialOrd + Ord  + Clone {
     fn get_source(&self) -> Name;
 }
 
-pub enum AddResult<Request, Name> where Request: Eq + PartialOrd + Ord + Clone + Source<Name>,
-                                        Name: Eq + PartialOrd + Ord + Clone {
+pub enum AddResult<Request, Name>
+    where Request: Eq + PartialOrd + Ord + Clone + Source<Name>,
+          Name: Eq + PartialOrd + Ord + Clone
+{
     RequestKeys(Name),
     Resolved(Request, SerialisedClaim),
 }
@@ -55,11 +57,13 @@ pub enum AddResult<Request, Name> where Request: Eq + PartialOrd + Ord + Clone +
 /// It further takes a Name type to identify claimants.
 /// Signature and PublicSignKey type are auxiliary types to handle a user-chosen
 /// cryptographic signing scheme.
-pub struct PureSentinel<Request, Name> where Request: Eq + PartialOrd + Ord + Clone + Source<Name>,
-                                         Name: Eq + PartialOrd + Ord + Clone {
-    claim_accumulator : Accumulator<Request, (Name, Signature, SerialisedClaim)>,
-    key_store         : KeyStore<Name>,
-    claim_quroum_size : Option<usize>,
+pub struct PureSentinel<Request, Name>
+    where Request: Eq + PartialOrd + Ord + Clone + Source<Name>,
+          Name: Eq + PartialOrd + Ord + Clone
+{
+    claim_accumulator: Accumulator<Request, (Name, Signature, SerialisedClaim)>,
+    key_store: KeyStore<Name>,
+    claim_quroum_size: Option<usize>,
 }
 
 impl<Request, Name>
@@ -72,14 +76,13 @@ impl<Request, Name>
     /// signing key. Each such a public signing key needs keys_threshold confirmations
     /// for it to be considered valid and used for verifying the signature
     /// of the corresponding claim.
-    pub fn new()
-        -> PureSentinel<Request, Name> {
+    pub fn new() -> PureSentinel<Request, Name> {
         PureSentinel {
-            claim_accumulator : Accumulator::new(0),
-            key_store         : KeyStore::new(),
+            claim_accumulator: Accumulator::new(0),
+            key_store: KeyStore::new(),
             // TODO: Would be nice if claim_accumulator gave us this value.
             // But there is no api for that yet.
-            claim_quroum_size : None,
+            claim_quroum_size: None,
         }
     }
 
@@ -96,12 +99,13 @@ impl<Request, Name>
     ///   should request public keys from the group surrounding the target.
     /// * None: indicating that no resolve was possible yet.
     pub fn add_claim(&mut self,
-                     request      : Request,
-                     claimant     : Name,            // Node which sent the message
-                     signature    : Signature,
-                     claim        : SerialisedClaim,
-                     claim_quorum : usize,
-                     key_quorum   : usize) -> Option<AddResult<Request, Name>> {
+                     request: Request,
+                     claimant: Name, // Node which sent the message
+                     signature: Signature,
+                     claim: SerialisedClaim,
+                     claim_quorum: usize,
+                     key_quorum: usize)
+                     -> Option<AddResult<Request, Name>> {
 
         let saw_first_time = !self.claim_accumulator.contains_key(&request);
 
@@ -128,9 +132,12 @@ impl<Request, Name>
     /// When the added set of keys leads to the resolution of the request,
     /// the request and the verified and merged claim is returned.
     /// Otherwise None is returned.
-    pub fn add_keys(&mut self, request : Request, sender: Name, keys : Vec<(Name, PublicKey)>,
+    pub fn add_keys(&mut self,
+                    request: Request,
+                    sender: Name,
+                    keys: Vec<(Name, PublicKey)>,
                     key_quorum: usize)
-        -> Option<(Request, SerialisedClaim)> {
+                    -> Option<(Request, SerialisedClaim)> {
         // We don't want to store keys for requests we haven't received yet because
         // we couldn't have requested those keys. So someone is probably trying
         // something silly.
@@ -140,7 +147,7 @@ impl<Request, Name>
 
         let claim_quorum = match self.claim_quroum_size {
             Some(q) => q,
-            None    => {
+            None => {
                 // Should have been assigned in `add_claim` function and we know
                 // it was called due to the above check.
                 debug_assert!(false);
@@ -160,26 +167,34 @@ impl<Request, Name>
 
     /// Verify is only concerned with checking the signatures of the serialised claims.
     /// To achieve this it pairs up a set of signed claims and a set of public signing keys.
-    fn verify(&mut self, claims : &Vec<(Name, Signature, SerialisedClaim)>, key_quorum: usize)
-        -> Vec<SerialisedClaim> {
+    fn verify(&mut self,
+              claims: &Vec<(Name, Signature, SerialisedClaim)>,
+              key_quorum: usize)
+              -> Vec<SerialisedClaim> {
         claims.iter().filter_map(|&(ref name, ref signature, ref body)| {
                 self.verify_single_claim(name, signature, body, key_quorum)
             }).collect()
     }
 
-    fn verify_single_claim(&mut self, name: &Name, signature: &Signature, body: &SerialisedClaim,
-                           key_quorum: usize) -> Option<SerialisedClaim> {
+    fn verify_single_claim(&mut self,
+                           name: &Name,
+                           signature: &Signature,
+                           body: &SerialisedClaim,
+                           key_quorum: usize)
+                           -> Option<SerialisedClaim> {
         for public_key in self.key_store.get_accumulated_keys(&name, key_quorum) {
             match super::verify_signature(&signature, &public_key, &body) {
                 Some(body) => return Some(body),
-                None => continue
+                None => continue,
             }
         }
         None
     }
 
-    fn squash(&self, verified_claims : Vec<SerialisedClaim>, quorum_size: usize)
-        -> Option<SerialisedClaim> {
+    fn squash(&self,
+              verified_claims: Vec<SerialisedClaim>,
+              quorum_size: usize)
+              -> Option<SerialisedClaim> {
         if verified_claims.len() < quorum_size {
             // Can't squash: not enough claims.
             return None;
@@ -204,9 +219,12 @@ impl<Request, Name>
         retval
     }
 
-    fn resolve(&mut self, request: Request, claims: Vec<(Name, Signature, SerialisedClaim)>,
-               claim_quorum: usize, key_quorum: usize)
-        -> Option<(Request, SerialisedClaim)> {
+    fn resolve(&mut self,
+               request: Request,
+               claims: Vec<(Name, Signature, SerialisedClaim)>,
+               claim_quorum: usize,
+               key_quorum: usize)
+               -> Option<(Request, SerialisedClaim)> {
         let verified_claims = self.verify(&claims, key_quorum);
         self.squash(verified_claims, claim_quorum)
             .map(|c| {
@@ -231,24 +249,26 @@ mod test {
 
     #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
     pub struct TestName {
-        pub data: Vec<u8>
+        pub data: Vec<u8>,
     }
 
     fn generate_random_name() -> TestName {
         let mut arr = [0u8;NAMESIZE];
-        for i in (0..NAMESIZE) { arr[i] = random::<u8>(); }
-        TestName { data : arr.to_vec() }
+        for i in (0..NAMESIZE) {
+            arr[i] = random::<u8>();
+        }
+        TestName { data: arr.to_vec() }
     }
 
     #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
     struct TestRequest {
-        core : usize,
-        name : TestName
+        core: usize,
+        name: TestName,
     }
 
     impl TestRequest {
         pub fn new(core: usize, name: TestName) -> TestRequest {
-            TestRequest { core : core, name : name }
+            TestRequest { core: core, name: name }
         }
     }
 
@@ -260,7 +280,7 @@ mod test {
 
     #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
     struct TestClaim {
-        value : usize
+        value: usize,
     }
 
     impl TestClaim {
@@ -269,14 +289,14 @@ mod test {
         }
     }
 
-#[test]
+    #[test]
     fn one_request_and_one_key() {
         let quorum_size = 1usize;
         let mut name_key_pairs = Vec::new();
         let mut pure_sentinel: PureSentinel<TestRequest, TestName> = PureSentinel::new();
         let name = generate_random_name();
         let request = TestRequest::new(random::<usize>(), name.clone());
-        let claim = TestClaim { value : random::<usize>() };
+        let claim = TestClaim { value: random::<usize>() };
         let serialised_claim = claim.serialise();
         let key_pair = crypto::sign::gen_keypair();
         let signature = crypto::sign::sign_detached(&serialised_claim, &key_pair.1);
@@ -287,27 +307,30 @@ mod test {
         assert!(pure_sentinel.add_claim(request.clone(), climant_name.clone(), signature.clone(),
                                         serialised_claim.clone(), quorum_size, quorum_size)
             .and_then(|result| match result {
-                AddResult::RequestKeys(source_name) => { assert_eq!(request.get_source(), source_name);
-                                                         Some(source_name)
-                                                       }
+                AddResult::RequestKeys(source_name) => {
+                    assert_eq!(request.get_source(), source_name);
+                    Some(source_name)
+                }
                 AddResult::Resolved(_, _) => None
             }).is_some());
 
         // One key is required should pass
-        assert!(pure_sentinel.add_keys(request.clone(), generate_random_name(), name_key_pairs.clone(),
-                                       quorum_size)
+        assert!(pure_sentinel.add_keys(request.clone(),
+                                        generate_random_name(),
+                                        name_key_pairs.clone(),
+                                        quorum_size)
             .and_then(|result| { assert_eq!(result.1, serialised_claim);
                                  assert_eq!(result.0, request);
                                  Some(result)
                                }).is_some());
     }
 
-#[test]
+    #[test]
     fn request_and_its_duplicate_added() {
         let mut pure_sentinel: PureSentinel<TestRequest, TestName> = PureSentinel::new();
         let name = generate_random_name();
         let request = TestRequest::new(random::<usize>(), name.clone());
-        let claim = TestClaim { value : random::<usize>() };
+        let claim = TestClaim { value: random::<usize>() };
         let serialised_claim = claim.serialise();
         let key_pair = crypto::sign::gen_keypair();
         let signature = crypto::sign::sign_detached(&serialised_claim, &key_pair.1);
@@ -327,13 +350,13 @@ mod test {
                                         QUORUM, QUORUM).is_none())
     }
 
-#[test]
+    #[test]
     fn threshold_claims_requests_added_with_no_keys() {
         let mut name_key_pairs = Vec::new();
         let mut pure_sentinel: PureSentinel<TestRequest, TestName> = PureSentinel::new();
         let name = generate_random_name();
         let request = TestRequest::new(random::<usize>(), name.clone());
-        let claim = TestClaim { value : random::<usize>() };
+        let claim = TestClaim { value: random::<usize>() };
         let serialised_claim = claim.serialise();
         for index in 0..QUORUM {
             let key_pair = crypto::sign::gen_keypair();
@@ -353,13 +376,13 @@ mod test {
         }
     }
 
-#[test]
+    #[test]
     fn requests_added_with_various_key_size() {
         let mut name_key_pairs = Vec::new();
         let mut pure_sentinel: PureSentinel<TestRequest, TestName> = PureSentinel::new();
         let name = generate_random_name();
         let request = TestRequest::new(random::<usize>(), name.clone());
-        let claim = TestClaim { value : random::<usize>() };
+        let claim = TestClaim { value: random::<usize>() };
         let serialised_claim = claim.serialise();
         for index in 0..QUORUM {
             let key_pair = crypto::sign::gen_keypair();
@@ -369,10 +392,11 @@ mod test {
             assert!(pure_sentinel.add_claim(request.clone(), climant_name, signature.clone(),
                                             serialised_claim.clone(), QUORUM, QUORUM)
                 .map_or(true, |result| match result {
-                    AddResult::RequestKeys(source_name) => { assert_eq!(request.get_source(), source_name);
-                                                             assert_eq!(index, 0usize);
-                                                             true
-                                                            },
+                    AddResult::RequestKeys(source_name) => {
+                        assert_eq!(request.get_source(), source_name);
+                        assert_eq!(index, 0usize);
+                        true
+                    },
                     AddResult::Resolved(_, _) => false
                 }));
         }

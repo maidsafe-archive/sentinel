@@ -7,7 +7,9 @@ pub struct SignW(pub sign::Signature);
 impl Clone for SignW {
     fn clone(&self) -> SignW {
         let mut bytes = [0u8; sign::SIGNATUREBYTES];
-        for i in (0..sign::SIGNATUREBYTES) { bytes[i] = (self.0).0[i] }
+        for i in (0..sign::SIGNATUREBYTES) {
+            bytes[i] = (self.0).0[i]
+        }
         SignW(sign::Signature(bytes))
     }
 }
@@ -42,4 +44,3 @@ impl PartialEq for SignW {
 }
 
 impl Eq for SignW { }
-
