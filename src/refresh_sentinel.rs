@@ -33,10 +33,13 @@ pub struct Entry<V> {
 
 /// Generic type for accumulating multiple values under a given key.
 #[allow(dead_code)]
-pub struct RefreshSentinel<K, V> where K: PartialOrd + Ord + Clone, V: Clone {
+pub struct RefreshSentinel<K, V>
+    where K: PartialOrd + Ord + Clone,
+          V: Clone
+{
     /// Threshold for resolution.
     quorum: usize,
-    storage: LruCache<K, Entry<V>>
+    storage: LruCache<K, Entry<V>>,
 }
 
 impl<K: PartialOrd + Ord + Clone, V: Clone> RefreshSentinel<K, V> {
@@ -65,12 +68,12 @@ impl<K: PartialOrd + Ord + Clone, V: Clone> RefreshSentinel<K, V> {
     }
 
     /// Adds a key/value pair, if the key already exists add the value under that key.
-    /// Optionally returns the key and the vector of values if the quroum has been reached. 
+    /// Optionally returns the key and the vector of values if the quroum has been reached.
     #[allow(dead_code)]
-    pub fn add(&mut self, key: K, value: V)-> Option<(K, Vec<V>)> {
+    pub fn add(&mut self, key: K, value: V) -> Option<(K, Vec<V>)> {
         let entry = self.storage.remove(&key);
         if entry.is_none() {
-            let entry_in = Entry { received_response : vec![value]};
+            let entry_in = Entry { received_response: vec![value] };
             self.storage.add(key.clone(), entry_in.clone());
             if self.quorum == 1 {
                 let result = (key, entry_in.received_response);
@@ -89,7 +92,7 @@ impl<K: PartialOrd + Ord + Clone, V: Clone> RefreshSentinel<K, V> {
 
     /// Retrieve a key/vec<value> pair from the cache.
     #[allow(dead_code)]
-    pub fn get(&mut self, key: &K) -> Option<(K, Vec<V>)>{
+    pub fn get(&mut self, key: &K) -> Option<(K, Vec<V>)> {
         let entry = self.storage.get(key);
         if entry.is_none() {
             None
@@ -124,7 +127,7 @@ mod test {
 
     #[test]
     fn add() {
-        let mut sentinel : RefreshSentinel<i32, u32> = RefreshSentinel::new(1);
+        let mut sentinel: RefreshSentinel<i32, u32> = RefreshSentinel::new(1);
 
         assert!(sentinel.add(2, 3).is_some());
         assert_eq!(sentinel.contains_key(&1), false);
@@ -154,16 +157,18 @@ mod test {
 
     #[test]
     fn add_single_value_quorum() {
-        let quorum_size : usize = 19;
-        let mut sentinel : RefreshSentinel<i32, u32> = RefreshSentinel::new(quorum_size);
+        let quorum_size: usize = 19;
+        let mut sentinel: RefreshSentinel<i32, u32> = RefreshSentinel::new(quorum_size);
         let key = rand::random::<i32>();
         let value = rand::random::<u32>();
-        for i in 0..quorum_size-1 {
+        for i in 0..quorum_size - 1 {
             assert!(sentinel.add(key, value).is_none());
             let key_value = sentinel.get(&key).unwrap();
             assert_eq!(key_value.0, key);
             assert_eq!(key_value.1.len(), i + 1);
-            for response in key_value.1 { assert_eq!(response, value); };
+            for response in key_value.1 {
+                assert_eq!(response, value);
+            };
             assert_eq!(sentinel.is_quorum_reached(&key), false);
         }
         assert!(sentinel.add(key, value).is_some());
@@ -171,15 +176,17 @@ mod test {
         let key_value = sentinel.get(&key).unwrap();
         assert_eq!(key_value.0, key);
         assert_eq!(key_value.1.len(), quorum_size);
-        for response in key_value.1 { assert_eq!(response, value); };
+        for response in key_value.1 {
+            assert_eq!(response, value);
+        };
     }
 
     #[test]
     fn add_multiple_values_quorum() {
-        let quorum_size : usize = 19;
-        let mut sentinel : RefreshSentinel<i32, u32> = RefreshSentinel::new(quorum_size);
+        let quorum_size: usize = 19;
+        let mut sentinel: RefreshSentinel<i32, u32> = RefreshSentinel::new(quorum_size);
         let key = rand::random::<i32>();
-        for _ in 0..quorum_size-1 {
+        for _ in 0..quorum_size - 1 {
             assert!(sentinel.add(key, rand::random::<u32>()).is_none());
             assert_eq!(sentinel.is_quorum_reached(&key), false);
         }
@@ -189,14 +196,17 @@ mod test {
 
     #[test]
     fn add_multiple_keys_quorum() {
-        let quorum_size : usize = 19;
-        let mut sentinel : RefreshSentinel<i32, u32> = RefreshSentinel::new(quorum_size);
+        let quorum_size: usize = 19;
+        let mut sentinel: RefreshSentinel<i32, u32> = RefreshSentinel::new(quorum_size);
         let key = rand::random::<i32>();
-        let mut noise_keys : Vec<i32> = Vec::with_capacity(5);
+        let mut noise_keys: Vec<i32> = Vec::with_capacity(5);
         while noise_keys.len() < 5 {
             let noise_key = rand::random::<i32>();
-            if noise_key != key { noise_keys.push(noise_key); }; };
-        for _ in 0..quorum_size-1 {
+            if noise_key != key {
+                noise_keys.push(noise_key);
+            };
+        };
+        for _ in 0..quorum_size - 1 {
             for noise_key in noise_keys.iter() {
                 sentinel.add(noise_key.clone(), rand::random::<u32>());
             }
@@ -209,7 +219,7 @@ mod test {
 
     #[test]
     fn delete() {
-        let mut sentinel : RefreshSentinel<i32, u32> = RefreshSentinel::new(2);
+        let mut sentinel: RefreshSentinel<i32, u32> = RefreshSentinel::new(2);
 
         assert!(sentinel.add(1, 1).is_none());
         assert_eq!(sentinel.contains_key(&1), true);
@@ -250,7 +260,7 @@ mod test {
 
     #[test]
     fn fill() {
-        let mut sentinel : RefreshSentinel<i32, u32> = RefreshSentinel::new(1);
+        let mut sentinel: RefreshSentinel<i32, u32> = RefreshSentinel::new(1);
 
         for count in 0..1000 {
             assert!(sentinel.add(count, 1).is_some());
@@ -269,7 +279,7 @@ mod test {
 
     #[test]
     fn cache_removals() {
-        let mut sentinel : RefreshSentinel<i32, u32> = RefreshSentinel::new(2);
+        let mut sentinel: RefreshSentinel<i32, u32> = RefreshSentinel::new(2);
 
         for count in 0..1000 {
             assert!(sentinel.add(count, 1).is_none());
@@ -303,7 +313,7 @@ mod test {
 
     #[test]
     fn set_quorum_size() {
-        let mut sentinel : RefreshSentinel<i32, u32> = RefreshSentinel::new(2);
+        let mut sentinel: RefreshSentinel<i32, u32> = RefreshSentinel::new(2);
         let random = rand::random::<usize>();
         sentinel.set_quorum(random);
         assert_eq!(random, sentinel.quorum);

@@ -57,11 +57,13 @@ mod wrappers;
 mod refresh_sentinel;
 mod statistics;
 
-fn verify_signature(signature: &Signature, public_key: &PublicKey, claim: &SerialisedClaim)
-        -> Option<SerialisedClaim> {
+fn verify_signature(signature: &Signature,
+                    public_key: &PublicKey,
+                    claim: &SerialisedClaim)
+                    -> Option<SerialisedClaim> {
 
     match crypto::sign::verify_detached(&signature, claim, public_key) {
         true => Some(claim.clone()),
-        false => None
+        false => None,
     }
 }
