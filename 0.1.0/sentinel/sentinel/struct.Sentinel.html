@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `Sentinel` struct in crate `sentinel`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, Sentinel">
+
+    <title>sentinel::sentinel::Sentinel - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../../main.css">
+
+    
+    
+</head>
+<body class="rustdoc">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <section class="sidebar">
+        
+        <p class='location'><a href='../index.html'>sentinel</a>::<wbr><a href='index.html'>sentinel</a></p><script>window.sidebarCurrent = {name: 'Sentinel', ty: 'struct', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+    </section>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press 'S' to search, '?' for more options..."
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content struct">
+<h1 class='fqn'><span class='in-band'>Struct <a href='../index.html'>sentinel</a>::<wbr><a href='index.html'>sentinel</a>::<wbr><a class='struct' href=''>Sentinel</a></span><span class='out-of-band'><span id='render-detail'>
+            <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                [<span class='inner'>&#x2212;</span>]
+            </a>
+        </span><a id='src-65' class='srclink' href='../../src/sentinel/sentinel.rs.html#58-63' title='goto source code'>[src]</a></span></h1>
+<pre class='rust struct'>pub struct Sentinel&lt;Request, Name&gt; <span class='where'>where Request: <a class='trait' href='http://doc.rust-lang.org/nightly/core/cmp/trait.Eq.html' title='core::cmp::Eq'>Eq</a> + <a class='trait' href='http://doc.rust-lang.org/nightly/core/cmp/trait.PartialOrd.html' title='core::cmp::PartialOrd'>PartialOrd</a> + <a class='trait' href='http://doc.rust-lang.org/nightly/core/cmp/trait.Ord.html' title='core::cmp::Ord'>Ord</a> + <a class='trait' href='http://doc.rust-lang.org/nightly/core/clone/trait.Clone.html' title='core::clone::Clone'>Clone</a> + <a class='trait' href='../../sentinel/sentinel/trait.Source.html' title='sentinel::sentinel::Source'>Source</a>&lt;Name&gt;, Name: <a class='trait' href='http://doc.rust-lang.org/nightly/core/cmp/trait.Eq.html' title='core::cmp::Eq'>Eq</a> + <a class='trait' href='http://doc.rust-lang.org/nightly/core/cmp/trait.PartialOrd.html' title='core::cmp::PartialOrd'>PartialOrd</a> + <a class='trait' href='http://doc.rust-lang.org/nightly/core/cmp/trait.Ord.html' title='core::cmp::Ord'>Ord</a> + <a class='trait' href='http://doc.rust-lang.org/nightly/core/clone/trait.Clone.html' title='core::clone::Clone'>Clone</a></span> {
+    // some fields omitted
+}</pre><div class='docblock'><p>Sentinel is templated on an immutable Request type, a mergeable Claim type.
+It further takes a Name type to identify claimants.
+Signature and PublicSignKey type are auxiliary types to handle a user-chosen
+cryptographic signing scheme.</p>
+</div><h2 id='methods'>Methods</h2><h3 class='impl'><code>impl&lt;Request, Name&gt; <a class='struct' href='../../sentinel/sentinel/struct.Sentinel.html' title='sentinel::sentinel::Sentinel'>Sentinel</a>&lt;Request, Name&gt; <span class='where'>where Request: <a class='trait' href='http://doc.rust-lang.org/nightly/core/cmp/trait.Eq.html' title='core::cmp::Eq'>Eq</a> + <a class='trait' href='http://doc.rust-lang.org/nightly/core/cmp/trait.PartialOrd.html' title='core::cmp::PartialOrd'>PartialOrd</a> + <a class='trait' href='http://doc.rust-lang.org/nightly/core/cmp/trait.Ord.html' title='core::cmp::Ord'>Ord</a> + <a class='trait' href='http://doc.rust-lang.org/nightly/core/clone/trait.Clone.html' title='core::clone::Clone'>Clone</a> + <a class='trait' href='../../sentinel/sentinel/trait.Source.html' title='sentinel::sentinel::Source'>Source</a>&lt;Name&gt;, Name: <a class='trait' href='http://doc.rust-lang.org/nightly/core/cmp/trait.Eq.html' title='core::cmp::Eq'>Eq</a> + <a class='trait' href='http://doc.rust-lang.org/nightly/core/cmp/trait.PartialOrd.html' title='core::cmp::PartialOrd'>PartialOrd</a> + <a class='trait' href='http://doc.rust-lang.org/nightly/core/cmp/trait.Ord.html' title='core::cmp::Ord'>Ord</a> + <a class='trait' href='http://doc.rust-lang.org/nightly/core/clone/trait.Clone.html' title='core::clone::Clone'>Clone</a></span></code></h3><div class='impl-items'><h4 id='method.new' class='method'><code>fn <a href='#method.new' class='fnname'>new</a>(claim_threshold: <a href='http://doc.rust-lang.org/nightly/std/primitive.usize.html'>usize</a>, keys_threshold: <a href='http://doc.rust-lang.org/nightly/std/primitive.usize.html'>usize</a>) -&gt; <a class='struct' href='../../sentinel/sentinel/struct.Sentinel.html' title='sentinel::sentinel::Sentinel'>Sentinel</a>&lt;Request, Name&gt;</code></h4>
+<div class='docblock'><p>This creates a new sentinel that will collect a minimal claim_threshold number
+of verified claims before attempting to merge these claims.
+To obtain a verified claim Sentinel needs to have received a matching public
+signing key. Each such a public signing key needs keys_threshold confirmations
+for it to be considered valid and used for verifying the signature
+of the corresponding claim.</p>
+</div><h4 id='method.add_claim' class='method'><code>fn <a href='#method.add_claim' class='fnname'>add_claim</a>(&amp;mut self, request: Request, claimant: Name, signature: <a class='struct' href='../../sodiumoxide/crypto/sign/ed25519/struct.Signature.html' title='sodiumoxide::crypto::sign::ed25519::Signature'>Signature</a>, claim: <a class='type' href='../../sentinel/type.SerialisedClaim.html' title='sentinel::SerialisedClaim'>SerialisedClaim</a>) -&gt; <a class='enum' href='http://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;<a class='enum' href='../../sentinel/sentinel/enum.AddResult.html' title='sentinel::sentinel::AddResult'>AddResult</a>&lt;Request, Name&gt;&gt;</code></h4>
+<div class='docblock'><p>This adds a new claim for the provided request. The claimant name and
+the signature provided will be used to verify the claim with the keys
+that are independently retrieved. When an added claim leads to the
+resolution of the request, the request and the claim are returned.
+All resolved claims have to be identical. Otherwise None is returned.</p>
+
+<p>Possible results are:
+* Some(AddResult::Resolved(request, serialised_claim)): indicating
+  that the claim has been successfully resolved.
+* Some(AddResult::RequestKeys(target)): indicating that the caller
+  should request public keys from the group surrounding the target.
+* None: indicating that no resolve was possible yet.</p>
+</div><h4 id='method.add_keys' class='method'><code>fn <a href='#method.add_keys' class='fnname'>add_keys</a>(&amp;mut self, request: Request, sender: Name, keys: <a class='struct' href='http://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;<a href='http://doc.rust-lang.org/nightly/std/primitive.tuple.html'>(Name, <a class='struct' href='../../sodiumoxide/crypto/sign/ed25519/struct.PublicKey.html' title='sodiumoxide::crypto::sign::ed25519::PublicKey'>PublicKey</a>)</a>&gt;) -&gt; <a class='enum' href='http://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;<a href='http://doc.rust-lang.org/nightly/std/primitive.tuple.html'>(Request, <a class='type' href='../../sentinel/type.SerialisedClaim.html' title='sentinel::SerialisedClaim'>SerialisedClaim</a>)</a>&gt;</code></h4>
+<div class='docblock'><p>This adds a new set of public_signing_keys for the provided request.
+If the request is not known yet by sentinel, the added keys will be ignored.
+When the added set of keys leads to the resolution of the request,
+the request and the verified and merged claim is returned.
+Otherwise None is returned.</p>
+</div></div></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <div id="help" class="hidden">
+        <div class="shortcuts">
+            <h1>Keyboard shortcuts</h1>
+            <dl>
+                <dt>?</dt>
+                <dd>Show this help dialog</dd>
+                <dt>S</dt>
+                <dd>Focus the search field</dd>
+                <dt>&larrb;</dt>
+                <dd>Move up in search results</dd>
+                <dt>&rarrb;</dt>
+                <dd>Move down in search results</dd>
+                <dt>&#9166;</dt>
+                <dd>Go to active search result</dd>
+            </dl>
+        </div>
+        <div class="infos">
+            <h1>Search tricks</h1>
+            <p>
+                Prefix searches with a type followed by a colon (e.g.
+                <code>fn:</code>) to restrict the search to a given type.
+            </p>
+            <p>
+                Accepted types are: <code>fn</code>, <code>mod</code>,
+                <code>struct</code>, <code>enum</code>,
+                <code>trait</code>, <code>typedef</code> (or
+                <code>tdef</code>).
+            </p>
+            <p>
+                Search functions by type signature (e.g.
+                <code>vec -> usize</code>)
+            </p>
+        </div>
+    </div>
+
+    
+
+    <script>
+        window.rootPath = "../../";
+        window.currentCrate = "sentinel";
+        window.playgroundUrl = "";
+    </script>
+    <script src="../../jquery.js"></script>
+    <script src="../../main.js"></script>
+    
+    <script async src="../../search-index.js"></script>
+</body>
+</html>

@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["pure_sentinel","Sentinel provides a consensus mechanism on all content messages. The claims made must be identical and cryptographically signed. PureSentinel cryptographically confirms the origin of a claim in a decentralised network."]],"type":[["SerialisedClaim",""]]});

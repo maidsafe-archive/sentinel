@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `sentinel` mod in crate `sentinel`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, sentinel">
+
+    <title>sentinel::sentinel - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../../main.css">
+
+    
+    
+</head>
+<body class="rustdoc">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <section class="sidebar">
+        
+        <p class='location'><a href='../index.html'>sentinel</a></p><script>window.sidebarCurrent = {name: 'sentinel', ty: 'mod', relpath: '../'};</script><script defer src="../sidebar-items.js"></script>
+    </section>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press 'S' to search, '?' for more options..."
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content mod">
+<h1 class='fqn'><span class='in-band'>Module <a href='../index.html'>sentinel</a>::<wbr><a class='mod' href=''>sentinel</a></span><span class='out-of-band'><span id='render-detail'>
+            <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                [<span class='inner'>&#x2212;</span>]
+            </a>
+        </span><a id='src-18' class='srclink' href='../../src/sentinel/sentinel.rs.html#18-364' title='goto source code'>[src]</a></span></h1>
+<div class='docblock'><p>Sentinel provides a consensus mechanism on all content messages.
+The claims made must be identical and cryptographically signed.
+Sentinel cryptographically confirms the origin of a claim in a decentralised network.</p>
+
+<p>A claim has to implement Claimable in order to be verifiable and mergeable.
+A request has to implement GetSigningKeys such that Sentinel can aqcuire
+the necessary public signing keys.
+The request is passed immutably through sentinel
+and is used as a key to group claims and corresponding keys.
+When sentinel resolves a threshold on verified and merged message,
+it returns the requestor key and the merged claim.
+Claimant names and associated signatures are discarded after succesful resolution,
+as such abstracting the original request into a resolved claim.</p>
+
+<p>The keys_threshold specifies a minimal threshold on the number of independent mentions of
+a single public signing key needed to consider it for verifying a claim.  This threshold
+can be one or higher.
+The claims_threshold specifies a minimal threshold on the number of verified claims before
+sentinel will attempt to merge these verified claims.</p>
+</div><h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
+<table>
+                    <tr class=' module-item'>
+                        <td><a class='struct' href='struct.Sentinel.html'
+                               title='sentinel::sentinel::Sentinel'>Sentinel</a></td>
+                        <td class='docblock short'>
+                             <p>Sentinel is templated on an immutable Request type, a mergeable Claim type.
+It further takes a Name type to identify claimants.
+Signature and PublicSignKey type are auxiliary types to handle a user-chosen
+cryptographic signing scheme.</p>
+
+                        </td>
+                    </tr>
+                </table><h2 id='enums' class='section-header'><a href="#enums">Enums</a></h2>
+<table>
+                    <tr class=' module-item'>
+                        <td><a class='enum' href='enum.AddResult.html'
+                               title='sentinel::sentinel::AddResult'>AddResult</a></td>
+                        <td class='docblock short'>
+                             
+                        </td>
+                    </tr>
+                </table><h2 id='traits' class='section-header'><a href="#traits">Traits</a></h2>
+<table>
+                    <tr class=' module-item'>
+                        <td><a class='trait' href='trait.Source.html'
+                               title='sentinel::sentinel::Source'>Source</a></td>
+                        <td class='docblock short'>
+                             
+                        </td>
+                    </tr>
+                </table></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <div id="help" class="hidden">
+        <div class="shortcuts">
+            <h1>Keyboard shortcuts</h1>
+            <dl>
+                <dt>?</dt>
+                <dd>Show this help dialog</dd>
+                <dt>S</dt>
+                <dd>Focus the search field</dd>
+                <dt>&larrb;</dt>
+                <dd>Move up in search results</dd>
+                <dt>&rarrb;</dt>
+                <dd>Move down in search results</dd>
+                <dt>&#9166;</dt>
+                <dd>Go to active search result</dd>
+            </dl>
+        </div>
+        <div class="infos">
+            <h1>Search tricks</h1>
+            <p>
+                Prefix searches with a type followed by a colon (e.g.
+                <code>fn:</code>) to restrict the search to a given type.
+            </p>
+            <p>
+                Accepted types are: <code>fn</code>, <code>mod</code>,
+                <code>struct</code>, <code>enum</code>,
+                <code>trait</code>, <code>typedef</code> (or
+                <code>tdef</code>).
+            </p>
+            <p>
+                Search functions by type signature (e.g.
+                <code>vec -> usize</code>)
+            </p>
+        </div>
+    </div>
+
+    
+
+    <script>
+        window.rootPath = "../../";
+        window.currentCrate = "sentinel";
+        window.playgroundUrl = "";
+    </script>
+    <script src="../../jquery.js"></script>
+    <script src="../../main.js"></script>
+    
+    <script async src="../../search-index.js"></script>
+</body>
+</html>

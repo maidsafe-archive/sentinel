@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["AddResult",""]],"struct":[["Sentinel","Sentinel is templated on an immutable Request type, a mergeable Claim type. It further takes a Name type to identify claimants. Signature and PublicSignKey type are auxiliary types to handle a user-chosen cryptographic signing scheme."]],"trait":[["Source",""]]});
