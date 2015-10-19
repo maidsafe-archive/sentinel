@@ -1,6 +1,6 @@
 env:
   global:
-    - secure: "gzmgOPjX4dbG5iE9YiGVK2YkcaJ57QKqxO0zB7pHSulpNf05OBGmwFFBPmawckODJaeig8NOekD9sdAD7CeWwVKl0Y8ayeleyT2M59S06L/pVrbkAzRy4YCQSvb85fjGsypK3kCh901HPB/o3XOrbY/VSquNGtVGJpot5Vp3AqU="
+    - secure: cDTiiSo64rNonxNJyF1FLWiJBmnE/vvrzkAEjAdK2S2SpIKtes3F+tHdJW+OmJb2ZSaKU6BGRR3GC87qH9AJOG+EFLfVv+3sD+8Sx77/8zQsqVbemu10OMyYgYItIlhl2AqMqOiouRE1odPiYaFvCzeUOhMKEguQrUP5zu2Dbkg=
     - LibSodiumVersion=1.0.3
     - ElfUtilsVersion=0.163
 os:
