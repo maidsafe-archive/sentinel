@@ -1,6 +1,6 @@
 env:
   global:
-    - secure: cDTiiSo64rNonxNJyF1FLWiJBmnE/vvrzkAEjAdK2S2SpIKtes3F+tHdJW+OmJb2ZSaKU6BGRR3GC87qH9AJOG+EFLfVv+3sD+8Sx77/8zQsqVbemu10OMyYgYItIlhl2AqMqOiouRE1odPiYaFvCzeUOhMKEguQrUP5zu2Dbkg=
+    - secure: 8af48032a348c574e4d4cf3213e4f49a9acfbc24
 os:
   - linux
   - osx
