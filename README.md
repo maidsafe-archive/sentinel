@@ -1,3 +1,9 @@
+# ***This repository is no longer maintained***
+# It has been moved to the maidsafe-archive organisation for reference only
+#
+#
+#
+#
 # Sentinel
 
 *Note:* This library is not being actively used or managed at the moment.  If this continues to be the case, it will likely become deprecated in the future.
